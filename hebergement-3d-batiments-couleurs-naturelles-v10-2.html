@@ -1,0 +1,2812 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Hébergement 3D — Interface moderne V2</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0f172a; font-family: system-ui, -apple-system, sans-serif; color: #e2e8f0; touch-action: none; }
+    canvas { display: block; position: fixed; top: 0; left: 0; width: 100% !important; height: 100% !important; z-index: 1; }
+    #sidebar, #toggle-sidebar, #clock, #confirm-bar, #info-panel, #hint { z-index: 100; }
+    #boot-error {
+      position: fixed; inset: 0; z-index: 200; background: #0f172a; color: #f87171;
+      display: none; align-items: center; justify-content: center; padding: 24px; text-align: center;
+      font-size: 14px; line-height: 1.5;
+    }
+    #boot-error.visible { display: flex; }
+    #map-controls { position:fixed; right:12px; top:58px; z-index:105; display:flex; flex-direction:column; gap:8px; }
+    #map-controls button { width:44px; height:44px; border-radius:12px; border:1px solid #475569; background:rgba(15,23,42,.94); color:#e2e8f0; font-size:22px; box-shadow:0 4px 12px rgba(0,0,0,.35); touch-action:manipulation; }
+    #map-controls button:active { background:#0369a1; }
+    #map-status { position:fixed; right:12px; bottom:58px; z-index:105; padding:7px 10px; border:1px solid #475569; border-radius:9px; background:rgba(15,23,42,.9); color:#cbd5e1; font-size:11px; pointer-events:none; }
+    #sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0; width: 270px; max-width: 88vw;
+      background: rgba(15, 23, 42, 0.97); border-right: 1px solid #334155; z-index: 100;
+      display: flex; flex-direction: column; transform: translateX(0); transition: transform 0.25s ease;
+      box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+    }
+    #sidebar.collapsed { transform: translateX(-100%); }
+    #sidebar-header { padding: 14px 16px 10px; border-bottom: 1px solid #1e293b; }
+    #sidebar-header h1 { font-size: 15px; color: #7dd3fc; font-weight: 600; }
+    #stats { padding: 12px 16px; font-size: 13px; line-height: 1.7; border-bottom: 1px solid #1e293b; background: #0f172a; }
+    #stats span { color: #22d3ee; font-weight: 700; }
+    #tools { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 7px; }
+    .tool-btn {
+      background: #1e293b; color: #e2e8f0; border: 1px solid #334155;
+      padding: 11px 13px; border-radius: 10px; font-size: 13px; text-align: left; cursor: pointer;
+    }
+    .tool-btn:active { transform: scale(0.97); }
+    .tool-btn.active { background: #0ea5e9; color: #0f172a; border-color: #38bdf8; font-weight: 600; }
+    .tool-btn.danger { background: #450a0a; border-color: #7f1d1d; }
+    .tool-btn.danger.active { background: #dc2626; color: white; border-color: #f87171; }
+    .tool-btn small { opacity: 0.8; font-size: 11px; }
+    #toggle-sidebar {
+      position: fixed; top: 12px; left: 12px; z-index: 110; width: 44px; height: 44px;
+      background: rgba(15, 23, 42, 0.95); border: 1px solid #334155; border-radius: 12px;
+      color: #e2e8f0; font-size: 20px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.4); transition: left 0.25s ease;
+    }
+    #sidebar:not(.collapsed) ~ #toggle-sidebar { left: 282px; }
+    #confirm-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; background: rgba(15, 23, 42, 0.97);
+      border-top: 1px solid #334155; padding: 12px 16px; display: none; z-index: 90;
+      gap: 10px; align-items: center; justify-content: center; box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+    }
+    #confirm-bar.visible { display: flex; }
+    #confirm-info { flex: 1; font-size: 13px; color: #94a3b8; }
+    #confirm-info strong { color: #e2e8f0; }
+    .confirm-btn { padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; }
+    #btn-confirm { background: #22c55e; color: #052e16; }
+    #btn-cancel { background: #334155; color: #e2e8f0; }
+    #hint {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: rgba(15,23,42,0.9); padding: 8px 16px; border-radius: 20px;
+      font-size: 12px; color: #94a3b8; z-index: 50; pointer-events: none;
+    }
+    #confirm-bar.visible ~ #hint { opacity: 0; }
+    #clock {
+      position: fixed; top: 12px; right: 12px; z-index: 90;
+      background: rgba(15,23,42,0.92); padding: 8px 14px; border-radius: 10px;
+      font-size: 14px; font-weight: 600; color: #e2e8f0; border: 1px solid #334155;
+    }
+    #info-panel {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 95;
+      background: rgba(15, 23, 42, 0.97); border-top: 1px solid #334155;
+      padding: 14px 16px; display: none; box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+      max-height: 42vh; overflow-y: auto;
+    }
+    #info-panel.visible { display: block; }
+    #info-panel h3 { font-size: 15px; color: #7dd3fc; margin-bottom: 8px; font-weight: 600; }
+    #info-panel .row { font-size: 13px; line-height: 1.65; color: #cbd5e1; }
+    #info-panel .row b { color: #e2e8f0; }
+    #info-panel .warn { color: #f87171; }
+    #info-panel .ok { color: #4ade80; }
+    #info-close {
+      position: absolute; top: 10px; right: 14px; background: #334155; border: none;
+      color: #e2e8f0; width: 32px; height: 32px; border-radius: 8px; font-size: 16px; cursor: pointer;
+    }
+    /* Mise en page compacte quand le téléphone est en paysage. */
+    @media (orientation: landscape) and (max-height: 520px) {
+      #sidebar { width: 230px; max-width: 42vw; }
+      #sidebar-header { padding: 7px 12px 6px; }
+      #stats { padding: 6px 12px; font-size: 11px; line-height: 1.45; }
+      #tools { padding: 7px; gap: 5px; }
+      .tool-btn { padding: 7px 9px; font-size: 11px; }
+      .tool-btn small { font-size: 10px; }
+      #sidebar:not(.collapsed) ~ #toggle-sidebar { left: 238px; }
+      #hint { bottom: 8px; font-size: 10px; padding: 6px 10px; }
+      #confirm-bar { padding: 6px 10px; }
+      .confirm-btn { padding: 8px 12px; font-size: 12px; }
+    }
+    @supports (padding: env(safe-area-inset-bottom)) {
+      #confirm-bar { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+      #info-panel { padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+    }
+  
+
+    .tool-group{border:1px solid #334155;border-radius:12px;background:rgba(30,41,59,.55);overflow:hidden;flex-shrink:0}
+    .tool-group>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 11px;font-size:13px;font-weight:700;color:#e2e8f0;cursor:pointer;background:#1e293b;touch-action:manipulation}
+    .tool-group>summary::-webkit-details-marker{display:none}
+    .tool-group>summary::after{content:'＋';font-size:16px;color:#7dd3fc}
+    .tool-group[open]>summary::after{content:'−'}
+    .tool-group[open]>summary{color:#7dd3fc;border-bottom:1px solid #334155}
+    .tool-group-content{display:flex;flex-direction:column;gap:6px;padding:8px}
+    .tool-group-content .tool-btn{width:100%}
+    #road-type-panel{margin:0;padding:8px}
+    @media (orientation:landscape) and (max-height:520px){.tool-group>summary{padding:8px 10px;font-size:11px}.tool-group-content{gap:4px;padding:5px}}
+
+    #road-type-panel{display:flex;flex-direction:column;gap:5px;margin:0 8px 8px;padding:8px;background:#111827;border:1px solid #334155;border-radius:10px}
+    #road-type-panel label{font-size:11px;color:#cbd5e1;font-weight:700}
+    #road-type-select{width:100%;padding:9px 8px;border-radius:7px;background:#1e293b;color:#f8fafc;border:1px solid #475569;font-size:12px}
+    #road-type-note{font-size:10px;color:#94a3b8;line-height:1.35}
+    #route-preview-details{display:none; width:100%; font-size:12px; line-height:1.35; color:#cbd5e1; margin-top:4px}
+    #route-preview-details strong{color:#f8fafc}
+    #confirm-bar.route-mode{flex-wrap:wrap; max-width:min(520px,94vw)}
+    #confirm-bar.route-mode #confirm-info{flex-basis:100%}
+
+    /* Refonte visuelle inspirée de la maquette validée */
+    #sidebar {
+      background: linear-gradient(180deg, rgba(15,29,45,.98), rgba(17,35,52,.97)) !important;
+      border-right: 1px solid rgba(148,163,184,.25) !important;
+      box-shadow: 12px 0 34px rgba(0,0,0,.28) !important;
+      backdrop-filter: blur(14px);
+    }
+    #sidebar h2, #sidebar .sidebar-title {
+      font-size: 20px !important; font-weight: 850 !important; letter-spacing: -.35px;
+      padding: 15px 13px !important; color:#f8fafc !important;
+    }
+    .tool-group {
+      border: 1px solid rgba(148,163,184,.18) !important;
+      border-radius: 11px !important; background: rgba(51,65,85,.42) !important;
+      margin-bottom: 7px !important; overflow:hidden;
+    }
+    .tool-group>summary {
+      background: linear-gradient(100deg,rgba(37,55,74,.96),rgba(30,45,62,.96)) !important;
+      padding: 13px 12px !important; font-size: 13.5px !important;
+      color:#f1f5f9 !important; letter-spacing:.1px;
+    }
+    .tool-group[open]>summary {
+      background: linear-gradient(100deg,#2875d8,#2563eb) !important;
+      color:white !important; border-bottom:0 !important;
+    }
+    .tool-group>summary::after { color:#dbeafe !important; }
+    .tool-group-content { padding:8px !important; gap:7px !important; }
+    .tool-btn {
+      border:1px solid rgba(148,163,184,.2) !important;
+      border-radius:9px !important; background:rgba(51,65,85,.72) !important;
+      color:#f8fafc !important; min-height:43px; text-align:left;
+      transition:background .15s, transform .15s;
+    }
+    .tool-btn:active { background:#2563eb !important; transform:scale(.985); }
+    .tool-btn small { color:#cbd5e1 !important; }
+    #toggle-sidebar {
+      border:1px solid rgba(148,163,184,.28) !important;
+      border-radius:13px !important; background:rgba(15,29,45,.97) !important;
+      box-shadow:0 5px 18px rgba(0,0,0,.3) !important;
+    }
+    #clock, #map-status, #hint {
+      border:1px solid rgba(148,163,184,.22) !important;
+      background:rgba(15,29,45,.94) !important; backdrop-filter:blur(10px);
+      border-radius:13px !important; box-shadow:0 5px 18px rgba(0,0,0,.18);
+    }
+    #confirm-bar {
+      background:rgba(15,29,45,.97) !important; border:1px solid rgba(148,163,184,.24);
+      border-radius:14px !important; box-shadow:0 8px 24px rgba(0,0,0,.3);
+    }
+    #info-panel {
+      background:rgba(15,29,45,.97) !important; border:1px solid rgba(148,163,184,.25);
+      border-radius:14px !important; box-shadow:0 8px 28px rgba(0,0,0,.32);
+    }
+    @media (max-width:600px) {
+      #sidebar { width:min(82vw,330px) !important; }
+      .tool-group>summary { padding:12px 10px !important; }
+      .tool-btn { min-height:45px; }
+    }
+
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <div id="sidebar-header"><h1>🏙️ Hébergement</h1></div>
+    <div id="stats">
+      Population : <span id="pop">0</span> pax<br>
+      Voitures : <span id="cars">0</span><br>
+      Bâtiments : <span id="buildings">0</span><br>
+      Nourriture : <span id="food">0</span> / <span id="foodneed">0</span><br>
+      Électricité : <span id="power">0</span> / <span id="powerneed">0</span> kWh/j<br>
+      Emplois : <span id="jobs">0</span><br>
+      Jour : <span id="gameday">0</span>
+    </div>
+    <div id="tools">
+      <details class="tool-group" open>
+        <summary>🛣️ Routes et circulation</summary>
+        <div class="tool-group-content">
+          <button class="tool-btn active" data-tool="road">🛣️ Construire une route</button>
+          <div id="road-type-panel">
+            <label for="road-type-select">TYPE DE ROUTE</label>
+            <select id="road-type-select">
+              <option value="street">Rue locale — 2 voies · 30 km/h</option>
+              <option value="avenue">Avenue — 4 voies · 50 km/h</option>
+              <option value="boulevard">Boulevard — 6 voies · 70 km/h</option>
+            </select>
+            <div id="road-type-note">Rue locale : chaussée étroite, sans ligne centrale.</div>
+          </div>
+          <button class="tool-btn" data-tool="crossing">🦓 Passage piéton</button>
+          <button class="tool-btn" data-tool="trafficlight">🚦 Feu tricolore</button>
+        </div>
+      </details>
+      <details class="tool-group" open>
+        <summary>🏘️ Habitation</summary>
+        <div class="tool-group-content">
+          <button class="tool-btn" data-tool="house">🏠 Petite maison<br><small>1×1 · 4 habitants · 1 voiture</small></button>
+          <button class="tool-btn" data-tool="medium">🏢 Immeuble moyen<br><small>2×2 · 20 habitants · 5 voitures</small></button>
+          <button class="tool-btn" data-tool="large">🏬 Grand immeuble<br><small>3×3 · 36 habitants · 9 voitures</small></button>
+        </div>
+      </details>
+      <details class="tool-group">
+        <summary>🌾 Agriculture et alimentation</summary>
+        <div class="tool-group-content">
+          <button class="tool-btn" data-tool="wheat">🌾 Champ de blé<br><small>3×3 · +60 nourriture · 6 emplois · 1 camion</small></button>
+          <button class="tool-btn" data-tool="rice">🌿 Champ de riz<br><small>3×3 · +60 nourriture · 6 emplois · 1 camion</small></button>
+          <button class="tool-btn" data-tool="mill">🏭 Minoterie<br><small>4×4 · 5 emplois · blé → farine</small></button>
+        </div>
+      </details>
+      <details class="tool-group">
+        <summary>🛢️ Industrie pétrolière</summary>
+        <div class="tool-group-content">
+          <button class="tool-btn" data-tool="oilwell">🛢️ Puits de pétrole<br><small>3×3 · extrait du pétrole brut</small></button>
+          <button class="tool-btn" data-tool="refinery">🏭 Raffinerie<br><small>5×5 · génère 2 camions-citernes</small></button>
+        </div>
+      </details>
+      <details class="tool-group">
+        <summary>⚡ Énergie électrique</summary>
+        <div class="tool-group-content">
+          <button class="tool-btn" data-tool="powerplant">⚡ Centrale électrique<br><small>4×4 · produit 500 kWh/j · 8 emplois</small></button>
+          <button class="tool-btn" data-tool="solar">☀️ Parc solaire<br><small>2×2 · produit 120 kWh/j · 2 emplois</small></button>
+          <button class="tool-btn" data-tool="wind">🌬️ Éolienne<br><small>2×2 · produit 180 kWh/j · 1 emploi</small></button>
+          <button class="tool-btn" data-tool="pole">🔌 Poteau électrique<br><small>1×1 · toute case libre hors route/bâtiment · écart min. 3 cases</small></button>
+        </div>
+      </details>
+      <details class="tool-group">
+        <summary>💾 Sauvegarde</summary>
+        <div class="tool-group-content">
+          <button class="tool-btn" id="save-game-btn">💾 Sauvegarder la partie</button>
+          <button class="tool-btn" id="load-game-btn">📂 Charger une partie</button>
+          <button class="tool-btn danger" id="new-game-btn">🆕 Nouvelle partie</button>
+          <small id="save-status" style="display:block;color:#cbd5e1;padding:6px 8px;line-height:1.4">Aucune sauvegarde détectée.</small>
+        </div>
+      </details>
+      <details class="tool-group">
+        <summary>🔧 Gestion de la ville</summary>
+        <div class="tool-group-content">
+          <button class="tool-btn" data-tool="nextday" style="background:#14532d;border-color:#166534;">⏭️ Jour suivant</button>
+          <button class="tool-btn danger" data-tool="erase">🗑️ Effacer</button>
+        </div>
+      </details>
+    </div>
+  </div>
+  <button id="toggle-sidebar">☰</button>
+  <div id="clock">12:00</div>
+  <div id="map-status" aria-live="polite">Carte : centre · Zoom : moyen</div>
+  <div id="map-controls" aria-label="Commandes de la carte">
+    <button id="rotate-left" title="Tourner à gauche" aria-label="Tourner à gauche">↶</button>
+    <button id="rotate-right" title="Tourner à droite" aria-label="Tourner à droite">↷</button>
+    <button id="reset-view" title="Vue initiale" aria-label="Vue initiale">⌂</button>
+  </div>
+  <div id="confirm-bar">
+    <div id="confirm-info">Prêt à construire</div><div id="route-preview-details"></div>
+    <button class="confirm-btn" id="btn-cancel">Annuler</button>
+    <button class="confirm-btn" id="btn-confirm">✓ Construire</button>
+  </div>
+  <div id="info-panel">
+    <button id="info-close">✕</button>
+    <h3 id="info-title">Bâtiment</h3>
+    <div id="info-body"></div>
+  </div>
+  <div id="hint">Déplace la vue · Pince pour zoomer · ↶ ↷ pour tourner la carte · Mode paysage conseillé</div>
+  <div id="boot-error"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script>
+    // Aide si Three.js ne charge pas (hors ligne)
+    setTimeout(function() {
+      if (typeof THREE === 'undefined' || !document.querySelector('canvas')) {
+        var el = document.getElementById('boot-error');
+        if (el && !el.classList.contains('visible')) {
+          el.innerHTML = 'La carte 3D ne charge pas.<br><br>1) Vérifie ta connexion internet<br>2) Ouvre le fichier dans <b>Chrome</b><br>3) Autorise l\'accès réseau pour ce fichier';
+          el.classList.add('visible');
+        }
+      }
+    }, 5000);
+  </script>
+  <script>
+  (function() {
+    if (typeof THREE === 'undefined') {
+      var el = document.getElementById('boot-error');
+      if (el) {
+        el.innerHTML = 'Three.js introuvable. Vérifie ta connexion internet puis recharge.';
+        el.classList.add('visible');
+      }
+      return;
+    }
+
+    const GRID_SIZE = 200, TILE = 8; // Carte agrandie 5 fois sur chaque côté (25 fois plus de surface).
+    const COLORS = {
+      grass: 0x3d6b3d, road: 0x3f3f46, roadMark: 0xd4d4d8, sidewalk: 0xa8a29e,
+      house: 0xd9bd91, medium: 0xd8d0c2, large: 0xbfc5c7,
+      wheat: 0xc9a227, rice: 0x4ade80, farmBuilding: 0x78716c, mill: 0xd6c3a1,
+      oil: 0x27272a, refinery: 0x64748b,
+      hover: 0x22d3ee, invalid: 0xef4444,
+      car: [0xf97316, 0xef4444, 0x3b82f6, 0x22c55e, 0xeab308, 0xa855f7, 0x64748b, 0xf8fafc],
+      truck: 0x92400e,
+      person: 0xfcd34d, door: 0x292524, window: 0x7dd3fc, windowNight: 0xfde68a
+    };
+    const BUILDINGS = {
+      house:  { w: 1, h: 1, pax: 4,  color: COLORS.house,  name: "Petite maison", height: 7, power: 8 },
+      medium: { w: 2, h: 2, pax: 20, color: COLORS.medium, name: "Immeuble moyen", height: 18, power: 35 },
+      large:  { w: 3, h: 3, pax: 36, color: COLORS.large, name: "Grand immeuble", height: 28, power: 70 },
+      powerplant: { w: 4, h: 4, pax: 0, color: 0x64748b, name: "Centrale électrique", height: 16, power: 25, production: 500, jobs: 8 },
+      solar: { w: 2, h: 2, pax: 0, color: 0x2563eb, name: "Parc solaire", height: 3, power: 5, production: 120, jobs: 2 },
+      wind: { w: 2, h: 2, pax: 0, color: 0xe2e8f0, name: "Éolienne", height: 18, power: 3, production: 180, jobs: 1 },
+      pole: { w: 1, h: 1, pax: 0, color: 0x94a3b8, name: "Poteau électrique", height: 8, power: 0, production: 0, jobs: 0 },
+      oilwell: { w: 3, h: 3, pax: 0, color: COLORS.oil, name: "Puits de pétrole", height: 8, power: 12, production: 0, jobs: 5 },
+      refinery: { w: 5, h: 5, pax: 0, color: COLORS.refinery, name: "Raffinerie", height: 12, power: 70, production: 0, jobs: 18 }
+    };
+    // Farm: 3x3 = 2x3 culture (top) + 1x3 work building (bottom row in local space)
+    const FARMS = {
+      wheat: { w: 3, h: 3, cropW: 3, cropH: 2, food: 60, jobs: 6, name: "Champ de blé", cropColor: 0xc9a227, matureColor: 0xeab308 },
+      rice:  { w: 3, h: 3, cropW: 3, cropH: 2, food: 60, jobs: 6, name: "Champ de riz", cropColor: 0x4ade80, matureColor: 0x22c55e }
+    };
+    // Plant height by growth day 0,1,2,3
+    const PLANT_HEIGHT = [0.35, 1.05, 1.8, 2.65];
+    const PLANT_COLORS_WHEAT = [0x86efac, 0xa3e635, 0xca8a04, 0xeab308];
+    const PLANT_COLORS_RICE  = [0xbbf7d0, 0x4ade80, 0x22c55e, 0x16a34a];
+    const DIRS = [
+      { dx: 0,  dz: 1,  yaw: Math.PI },
+      { dx: 1,  dz: 0,  yaw: -Math.PI / 2 },
+      { dx: 0,  dz: -1, yaw: 0 },
+      { dx: -1, dz: 0,  yaw: Math.PI / 2 }
+    ];
+
+    let gameHour = 12, isNight = false;
+    const clockEl = document.getElementById('clock');
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+    scene.fog = new THREE.Fog(0x87ceeb, 700, 2600);
+    const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 1, 10000);
+    const mapCenter = GRID_SIZE * TILE / 2;
+    const mapWorldSize = GRID_SIZE * TILE;
+    const mapStatusEl = document.getElementById("map-status");
+    camera.position.set(mapCenter + 180, 150, mapCenter + 180);
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'default' });
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      renderer.domElement.style.zIndex = '1';
+      document.body.appendChild(renderer.domElement);
+    } catch (err) {
+      const el = document.getElementById('boot-error');
+      el.textContent = 'Impossible de démarrer la carte 3D (WebGL). Ouvre ce fichier dans Chrome/Firefox avec une connexion internet (Three.js est chargé depuis le web).';
+      el.classList.add('visible');
+      throw err;
+    }
+
+    // Contrôles tactiles simples (sans OrbitControls — compatible content:// Android)
+    const controls = {
+      target: new THREE.Vector3(mapCenter, 0, mapCenter),
+      minDistance: 30,
+      maxDistance: 2600,
+      update: function() {}
+    };
+    camera.lookAt(controls.target);
+
+    (function setupTouchControls() {
+      const el = renderer.domElement;
+      let mode = null; // 'pan' | 'pinch'
+      let lastX = 0, lastY = 0;
+      let lastDist = 0;
+      const spherical = new THREE.Spherical();
+      const offset = new THREE.Vector3();
+
+      function syncSpherical() {
+        offset.copy(camera.position).sub(controls.target);
+        spherical.setFromVector3(offset);
+      }
+      syncSpherical();
+
+      function applyCam() {
+        // Empêche de déplacer la caméra très loin hors de la carte.
+        controls.target.x = Math.max(0, Math.min(mapWorldSize, controls.target.x));
+        controls.target.z = Math.max(0, Math.min(mapWorldSize, controls.target.z));
+        spherical.radius = Math.max(controls.minDistance, Math.min(controls.maxDistance, spherical.radius));
+        spherical.phi = Math.max(0.15, Math.min(Math.PI / 2.15, spherical.phi));
+        offset.setFromSpherical(spherical);
+        camera.position.copy(controls.target).add(offset);
+        camera.lookAt(controls.target);
+        if (mapStatusEl) {
+          const cx = Math.max(1, Math.min(GRID_SIZE, Math.floor(controls.target.x / TILE) + 1));
+          const cz = Math.max(1, Math.min(GRID_SIZE, Math.floor(controls.target.z / TILE) + 1));
+          const zoom = spherical.radius < 180 ? 'proche' : spherical.radius < 650 ? 'moyen' : 'large';
+          mapStatusEl.textContent = `Secteur : ${cx}, ${cz} · Vue : ${zoom}`;
+        }
+      }
+
+      el.addEventListener('pointerdown', (e) => {
+        if (e.target.closest && e.target.closest('#sidebar, #toggle-sidebar, #confirm-bar, #info-panel')) {
+          pointers.delete(e.pointerId);
+          return;
+        }
+      });
+
+      let pointers = new Map();
+      el.addEventListener('pointerdown', (e) => {
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pointers.size === 1) {
+          mode = 'pan';
+          lastX = e.clientX; lastY = e.clientY;
+        } else if (pointers.size === 2) {
+          mode = 'pinch';
+          const pts = [...pointers.values()];
+          lastDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        }
+      });
+      el.addEventListener('pointermove', (e) => {
+        if (!pointers.has(e.pointerId)) return;
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (mode === 'pan' && pointers.size === 1) {
+          const dx = e.clientX - lastX;
+          const dy = e.clientY - lastY;
+          lastX = e.clientX; lastY = e.clientY;
+          // Pan parallel to ground
+          const forward = new THREE.Vector3();
+          camera.getWorldDirection(forward);
+          forward.y = 0; forward.normalize();
+          const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0,1,0)).normalize();
+          const speed = spherical.radius * 0.0025;
+          controls.target.addScaledVector(right, -dx * speed);
+          controls.target.addScaledVector(forward, dy * speed);
+          applyCam();
+        } else if (mode === 'pinch' && pointers.size === 2) {
+          const pts = [...pointers.values()];
+          const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          if (lastDist > 0) {
+            const scale = lastDist / dist;
+            spherical.radius *= scale;
+            applyCam();
+          }
+          lastDist = dist;
+        }
+      });
+      function endPtr(e) {
+        pointers.delete(e.pointerId);
+        if (pointers.size === 0) mode = null;
+        else if (pointers.size === 1) {
+          mode = 'pan';
+          const p = [...pointers.values()][0];
+          lastX = p.x; lastY = p.y;
+        }
+      }
+      el.addEventListener('pointerup', endPtr);
+      el.addEventListener('pointercancel', endPtr);
+      el.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        spherical.radius *= (e.deltaY > 0 ? 1.1 : 0.9);
+        applyCam();
+      }, { passive: false });
+    })();
+
+    // Rotation complète de la caméra autour de la ville, commandes adaptées au tactile.
+    function rotateMap(delta) {
+      const offset = new THREE.Vector3().copy(camera.position).sub(controls.target);
+      const spherical = new THREE.Spherical().setFromVector3(offset);
+      spherical.theta += delta;
+      offset.setFromSpherical(spherical);
+      camera.position.copy(controls.target).add(offset);
+      camera.lookAt(controls.target);
+      if (typeof mapStatusEl !== 'undefined' && mapStatusEl) {
+        const cx = Math.max(1, Math.min(GRID_SIZE, Math.floor(controls.target.x / TILE) + 1));
+        const cz = Math.max(1, Math.min(GRID_SIZE, Math.floor(controls.target.z / TILE) + 1));
+        const zoom = spherical.radius < 180 ? 'proche' : spherical.radius < 650 ? 'moyen' : 'large';
+        mapStatusEl.textContent = `Secteur : ${cx}, ${cz} · Vue : ${zoom}`;
+      }
+    }
+    document.getElementById('rotate-left').addEventListener('click', () => rotateMap(Math.PI / 4));
+    document.getElementById('rotate-right').addEventListener('click', () => rotateMap(-Math.PI / 4));
+    document.getElementById('reset-view').addEventListener('click', () => {
+      controls.target.set(mapCenter, 0, mapCenter);
+      camera.position.set(mapCenter + 180, 150, mapCenter + 180);
+      camera.lookAt(controls.target);
+      if (mapStatusEl) mapStatusEl.textContent = 'Secteur : 101, 101 · Vue : moyen';
+    });
+    addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'q') rotateMap(Math.PI / 12);
+      if (e.key.toLowerCase() === 'e') rotateMap(-Math.PI / 12);
+    });
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambient);
+    const sun = new THREE.DirectionalLight(0xfff5e6, 1.1);
+    sun.position.set(100, 200, 80); scene.add(sun);
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(GRID_SIZE * TILE, GRID_SIZE * TILE),
+      new THREE.MeshLambertMaterial({ color: COLORS.grass })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.set(GRID_SIZE * TILE / 2, 0, GRID_SIZE * TILE / 2);
+    scene.add(ground);
+    const gridHelper = new THREE.GridHelper(GRID_SIZE * TILE, GRID_SIZE, 0x1e293b, 0x1e293b);
+    gridHelper.position.set(GRID_SIZE * TILE / 2, 0.04, GRID_SIZE * TILE / 2);
+    scene.add(gridHelper);
+
+    const roadsGroup = new THREE.Group(), buildingsGroup = new THREE.Group();
+    const intersectionsGroup = new THREE.Group();
+    const carsGroup = new THREE.Group(), peopleGroup = new THREE.Group();
+    const decorGroup = new THREE.Group(), previewGroup = new THREE.Group();
+    const gardensGroup = new THREE.Group();
+    scene.add(roadsGroup, intersectionsGroup, gardensGroup, buildingsGroup, carsGroup, peopleGroup, decorGroup, previewGroup);
+    const gardenCells = new Set();
+
+    const grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
+    const roadExtras = new Map();
+    const buildingMap = new Map();
+    const powerLinesGroup = new THREE.Group();
+    scene.add(powerLinesGroup);
+    const farmMap = new Map(); // key -> farm data
+    const millMap = new Map(); // key -> minoteries
+    let wheatStock = 0, flourStock = 0; // wheatStock = field stock awaiting truck transport
+    let activeInfoTile = null;
+    const windowMeshes = [];
+    let totalPop = 0, totalCars = 0, totalBuildings = 0;
+    let foodStock = 0, totalJobs = 0, gameDay = 0;
+    let powerProduced = 0, powerDemand = 0;
+    let lastGameDay = 0;
+    const cars = [], people = [], trucks = [];
+    let currentTool = 'road', pending = null, roadStart = null;
+    let selectedRoadType = 'street';
+    const ROAD_TYPES = {
+      street:{name:'Rue locale', lanes:2, width:4.2, speed:30, capacity:1, cost:80, maintenance:2, color:0x52525b, line:0x9ca3af},
+      avenue:{name:'Avenue (4 voies)', lanes:4, width:5.6, speed:50, capacity:2, cost:140, maintenance:4, color:0x3f4148, line:0xfacc15},
+      boulevard:{name:'Boulevard (6 voies)', lanes:6, width:7.0, speed:70, capacity:3, cost:220, maintenance:7, color:0x30343b, line:0xf8fafc}
+    };
+    function roadTypeAt(x,z) { const t=roadExtras.get(key(x,z))?.roadType; return ROAD_TYPES[t] ? t : 'street'; }
+    function roadSpeedFactor(x,z) { return (ROAD_TYPES[roadTypeAt(x,z)].speed / 50) * 1.15; }
+    const roadTypeSelect = document.getElementById('road-type-select');
+    roadTypeSelect.addEventListener('change',()=>{ selectedRoadType=roadTypeSelect.value; const r=ROAD_TYPES[selectedRoadType]; document.getElementById('road-type-note').textContent=`${r.lanes} voies · ${r.speed} km/h · largeur ${r.width.toFixed(1)} unités · capacité ${r.capacity}×`; });
+    roadTypeSelect.options[0].textContent='Rue locale — 2 voies · 30 km/h';
+    roadTypeSelect.options[1].textContent='Avenue — 4 voies · 50 km/h';
+    roadTypeSelect.options[2].textContent='Boulevard — 6 voies · 70 km/h';
+    document.getElementById('road-type-note').textContent='2 voies · 30 km/h · largeur 4,2 unités · capacité 1×';
+
+    const sidebar = document.getElementById('sidebar');
+    const confirmBar = document.getElementById('confirm-bar');
+    const confirmInfo = document.getElementById('confirm-info');
+    document.getElementById('toggle-sidebar').onclick = () => sidebar.classList.toggle('collapsed');
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+      btn.onclick = () => {
+        const tool = btn.dataset.tool;
+        if (tool === 'nextday') { advanceDay(); return; }
+        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentTool = tool;
+        cancelPending();
+        if (innerWidth < 700) sidebar.classList.add('collapsed');
+      };
+    });
+    function refreshPowerNetwork() {
+      while (powerLinesGroup.children.length) {
+        const obj = powerLinesGroup.children.pop();
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+          else obj.material.dispose();
+        }
+      }
+      const poles = [...buildingMap.values()].filter(d => d.type === 'pole');
+      const sources = [...buildingMap.values()].filter(d => (BUILDINGS[d.type]?.production || 0) > 0);
+      const consumers = [
+        ...[...buildingMap.values()].filter(d => d.type !== 'pole' && (BUILDINGS[d.type]?.power || 0) > 0),
+        ...[...farmMap.values()].map(f => ({tx:f.tx,tz:f.tz,w:f.w||3,h:f.h||3,type:'farm'})),
+        ...[...millMap.values()].map(m => ({tx:m.tx,tz:m.tz,w:m.w||4,h:m.h||4,type:'mill'}))
+      ];
+      if (!poles.length) return;
+      const mat = new THREE.LineBasicMaterial({color:0x38bdf8, transparent:true, opacity:0.9});
+      const polePos = p => new THREE.Vector3((p.tx+0.5)*TILE, 7.2, (p.tz+0.5)*TILE);
+      const drawWire = (a,b) => {
+        powerLinesGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]), mat.clone()));
+      };
+      // Réseau aérien : poteaux alignés, espacés de 3 cases maximum.
+      // Le placement empêche les poteaux trop rapprochés ; on relie donc les voisins
+      // alignés sur une même ligne/colonne lorsque l'écart est de 3 cases au plus.
+      for (let i=0;i<poles.length;i++) for (let j=i+1;j<poles.length;j++) {
+        const a=poles[i], b=poles[j];
+        const dx=Math.abs(a.tx-b.tx), dz=Math.abs(a.tz-b.tz);
+        if ((dx===0 && dz>0 && dz<=3) || (dz===0 && dx>0 && dx<=3)) {
+          const blocked = poles.some((p,k) => k!==i && k!==j &&
+            ((dx===0 && p.tx===a.tx && p.tz>Math.min(a.tz,b.tz) && p.tz<Math.max(a.tz,b.tz)) ||
+             (dz===0 && p.tz===a.tz && p.tx>Math.min(a.tx,b.tx) && p.tx<Math.max(a.tx,b.tx))));
+          if (!blocked) drawWire(polePos(a),polePos(b));
+        }
+      }
+      // Short service drop from a generator to a nearby pole.
+      for (const src of sources) {
+        const nearest=poles.reduce((best,p)=> {
+          const d=Math.abs(p.tx-(src.tx+src.w/2))+Math.abs(p.tz-(src.tz+src.h/2));
+          return !best || d<best.d ? {p,d} : best;
+        },null);
+        if (nearest && nearest.d<=5) drawWire(new THREE.Vector3((src.tx+src.w/2)*TILE,Math.max(3,BUILDINGS[src.type]?.height||3),(src.tz+src.h/2)*TILE),polePos(nearest.p));
+      }
+      // Visible service connection from the closest pole to each building/farm/mill.
+      for (const c of consumers) {
+        const nearest=poles.reduce((best,p)=> {
+          const d=Math.abs(p.tx-(c.tx+(c.w||1)/2))+Math.abs(p.tz-(c.tz+(c.h||1)/2));
+          return !best || d<best.d ? {p,d} : best;
+        },null);
+        if (nearest && nearest.d<=4) {
+          const target = new THREE.Vector3((c.tx+(c.w||1)/2)*TILE, c.type==='farm' || c.type==='mill' ? 3 : (BUILDINGS[c.type]?.height||4)*0.7, (c.tz+(c.h||1)/2)*TILE);
+          drawWire(polePos(nearest.p),target);
+        }
+      }
+    }
+    function calculatePower() {
+      let produced = 0, demand = 0;
+      for (const data of buildingMap.values()) {
+        const def = BUILDINGS[data.type];
+        if (!def) continue;
+        demand += def.power || 0;
+        produced += def.production || 0;
+      }
+      // Consommation journalière des activités économiques.
+      for (const farm of farmMap.values()) demand += 15;
+      for (const mill of millMap.values()) demand += 80;
+      powerProduced = produced; powerDemand = demand;
+      return { produced, demand, balance: produced - demand };
+    }
+    function updateStats() {
+      document.getElementById('pop').textContent = totalPop;
+      document.getElementById('cars').textContent = totalCars;
+      document.getElementById('buildings').textContent = totalBuildings;
+      const need = totalPop * 2;
+      document.getElementById('food').textContent = Math.floor(foodStock);
+      document.getElementById('foodneed').textContent = need;
+      document.getElementById('food').style.color = foodStock < need ? '#f87171' : '#22d3ee';
+      document.getElementById('jobs').textContent = totalJobs;
+      const power = calculatePower();
+      document.getElementById('power').textContent = Math.floor(power.produced);
+      document.getElementById('powerneed').textContent = Math.floor(power.demand);
+      document.getElementById('power').style.color = power.produced >= power.demand ? '#4ade80' : '#f87171';
+      let powerStatus = document.getElementById('powerstatus');
+      if (!powerStatus) {
+        powerStatus = document.createElement('div');
+        powerStatus.id = 'powerstatus';
+        document.getElementById('power').parentElement.appendChild(powerStatus);
+      }
+      const coverage = power.demand > 0 ? Math.min(100, Math.round(power.produced / power.demand * 100)) : 100;
+      powerStatus.textContent = coverage >= 100 ? 'Réseau : capacité suffisante' : `Réseau : pénurie ${100 - coverage}%`;
+      powerStatus.style.color = coverage >= 100 ? '#4ade80' : '#f87171';
+      document.getElementById('gameday').textContent = gameDay;
+    }
+    document.getElementById('btn-confirm').onclick = confirmPending;
+    document.getElementById('btn-cancel').onclick = cancelPending;
+    const infoPanel = document.getElementById('info-panel');
+    const infoTitle = document.getElementById('info-title');
+    const infoBody = document.getElementById('info-body');
+    document.getElementById('info-close').onclick = hideInfo;
+    function hideInfo() { infoPanel.classList.remove('visible'); activeInfoTile = null; }
+    function findBuildingAt(tx, tz) {
+      for (const [, data] of buildingMap) {
+        const b = BUILDINGS[data.type];
+        if (tx >= data.tx && tx < data.tx + b.w && tz >= data.tz && tz < data.tz + b.h) return { kind: 'building', data, b };
+      }
+      for (const [, mill] of millMap) {
+        if (tx >= mill.tx && tx < mill.tx + 4 && tz >= mill.tz && tz < mill.tz + 4) return { kind: 'mill', mill };
+      }
+      for (const [, farm] of farmMap) {
+        if (tx >= farm.tx && tx < farm.tx + farm.w && tz >= farm.tz && tz < farm.tz + farm.h) return { kind: 'farm', farm };
+      }
+      return null;
+    }
+    function showInfoAt(tx, tz) {
+      const hit = findBuildingAt(tx, tz);
+      if (!hit) return false;
+      cancelPending();
+      if (hit.kind === 'building' && ['powerplant','solar','wind'].includes(hit.data.type)) {
+        const p = calculatePower();
+        infoTitle.textContent = BUILDINGS[hit.data.type].name;
+        const sourceDef = BUILDINGS[hit.data.type];
+        infoBody.innerHTML = `<div class="row">Type : <b>Production d’électricité</b></div><div class="row">Taille : <b>${sourceDef.w}×${sourceDef.h} cases</b></div><div class="row">Production : <b>${sourceDef.production} kWh/jour</b></div><div class="row">Consommation propre : <b>${sourceDef.power} kWh/jour</b></div><div class="row">Emplois : <b>${sourceDef.jobs}</b></div><div class="row">Production totale de la ville : <b>${Math.floor(p.produced)} kWh/j</b></div><div class="row">Besoins totaux : <b>${Math.floor(p.demand)} kWh/j</b></div><div class="row">Bilan : <b class="${p.balance >= 0 ? 'ok' : 'warn'}">${p.balance >= 0 ? '+' : ''}${Math.floor(p.balance)} kWh/j</b></div><div class="row">État : <b class="${p.balance >= 0 ? 'ok' : 'warn'}">${p.balance >= 0 ? 'Production suffisante' : 'Déficit électrique'}</b></div>`;
+      } else if (hit.kind === 'building') {
+        const { data, b } = hit;
+        const carsGen = Math.floor(data.pax / 4);
+        const foodNeed = data.pax * 2;
+        const cityNeed = totalPop * 2;
+        const foodOk = foodStock >= cityNeed;
+        infoTitle.textContent = b.name;
+        infoBody.innerHTML = `
+          <div class="row">Type : <b>Hébergement</b></div>
+          <div class="row">Taille : <b>${b.w}×${b.h}</b></div>
+          <div class="row">Habitants : <b>${data.pax}</b> pax</div>
+          <div class="row">Besoin électrique : <b>${b.power || 0} kWh/jour</b></div>
+          <div class="row">Voitures générées : <b>${carsGen}</b></div>
+          <div class="row">Besoin alimentaire (ce bâtiment) : <b>${foodNeed}</b> / jour</div>
+          <div class="row">Nourriture ville : <b class="${foodOk ? 'ok' : 'warn'}">${Math.floor(foodStock)} / ${cityNeed}</b>
+            ${foodOk ? '' : '<span class="warn"> — pénurie</span>'}</div>
+          <div class="row">Emplois ville : <b>${totalJobs}</b>
+            ${totalJobs < totalPop ? '<span class="warn"> — emplois insuffisants</span>' : '<span class="ok"> — OK</span>'}</div>
+        `;
+      } else if (hit.kind === 'mill') {
+        const mill = hit.mill;
+        infoTitle.textContent = 'Minoterie';
+        const actualInput = mill.lastInput || 0;
+        infoBody.innerHTML = `
+          <div class="row">Type : <b>Transformation agroalimentaire</b></div>
+          <div class="row">Taille : <b>4×4 cases</b></div>
+          <div class="row">Employés : <b>5</b> (1 responsable, 2 opérateurs, 1 logisticien, 1 technicien)</div>
+          <div class="row">Besoin électrique : <b>80 kWh/jour</b></div>
+          <div class="row">Blé en attente de transport aux champs : <b id="mill-field-stock">${Math.floor(wheatStock)} kg</b></div>
+          <div class="row">Stock de blé livré à cette minoterie : <b id="mill-wheat-stock">${Math.floor(mill.wheatStock)} kg</b></div>
+          <div class="row">Capacité de transport : <b>20 kg par camion et par jour</b></div>
+          <div class="row">Ressources souhaitées par jour : <b><span id="mill-input-value">${mill.dailyInput}</span> kg</b></div>
+          <input id="mill-input" aria-label="Ressources de blé transformées par jour" type="range" min="0" max="200" step="10" value="${mill.dailyInput}" style="width:100%;accent-color:#d6a34a">
+          <div class="row">Blé transformé au dernier jour : <b id="mill-actual-input">${Math.floor(actualInput)} kg</b></div>
+          <div class="row">Farine produite au dernier jour : <b><span id="mill-output-value">${Math.floor(mill.lastOutput)}</span> kg</b> (production = blé transformé ÷ 2)
+          <div class="row">Stock de farine total : <b id="mill-flour-stock">${Math.floor(flourStock)} kg</b></div>
+        `;
+        const slider = document.getElementById('mill-input');
+        slider.addEventListener('input', () => {
+          mill.dailyInput = Number(slider.value);
+          document.getElementById('mill-input-value').textContent = mill.dailyInput;
+          const effective = Math.min(mill.dailyInput, mill.wheatStock);
+          document.getElementById('mill-actual-input').textContent = `${Math.floor(effective)} kg prévus`;
+          document.getElementById('mill-output-value').textContent = Math.floor(effective / 2);
+        });
+      } else {
+        const farm = hit.farm;
+        const fdef = FARMS[farm.type];
+        const phases = ['Planté (germes)', 'Pousse', 'Maturation', 'Récolte prête'];
+        const phase = phases[Math.min(3, farm.growthDay)] || phases[0];
+        const daysLeft = Math.max(0, 3 - farm.growthDay);
+        const truck = trucks.find(t => t.farmKey === key(farm.tx, farm.tz));
+        const truckState = !truck ? 'Aucun' : truck.loading ? 'Chargement au champ…' : 'En circulation';
+        infoTitle.textContent = fdef.name;
+        infoBody.innerHTML = `
+          <div class="row">Type : <b>Agriculture</b></div>
+          <div class="row">Taille : <b>3×3</b> (culture 2×3 + bâtiment 1×3)</div>
+          <div class="row">Phase : <b>${phase}</b></div>
+          <div class="row">Jours avant récolte : <b>${daysLeft}</b></div>
+          <div class="row">Production à la récolte : <b>+${farm.food}</b> nourriture (10 par case cultivée)</div>
+          <div class="row">Travailleurs : <b>${farm.jobs}</b></div>
+          <div class="row">Besoin électrique : <b>15 kWh/jour</b></div>
+          <div class="row">Camion : <b>${truckState}</b></div>
+          <div class="row">Stock ville : <b>${Math.floor(foodStock)}</b> · Besoin : <b>${totalPop * 2}</b> / jour</div>
+        `;
+      }
+      // Every inspected building exposes a direct demolition action.
+      const oldDemolish = document.getElementById('demolish-building-btn');
+      if (oldDemolish) oldDemolish.remove();
+      const demolishBtn = document.createElement('button');
+      demolishBtn.id = 'demolish-building-btn';
+      demolishBtn.type = 'button';
+      demolishBtn.textContent = '🗑️ Démolir ce bâtiment';
+      demolishBtn.style.cssText = 'width:100%;margin-top:12px;padding:12px;border:1px solid #7f1d1d;border-radius:10px;background:#7f1d1d;color:#fff;font-weight:700;font-size:14px;';
+      demolishBtn.addEventListener('click', () => {
+        const tile = activeInfoTile;
+        if (!tile) return;
+        eraseAt(tile.x, tile.z);
+        hideInfo();
+      });
+      infoBody.appendChild(demolishBtn);
+      activeInfoTile = { x: tx, z: tz };
+      infoPanel.classList.add('visible');
+      return true;
+    }
+
+    function key(x, z) { return x + ',' + z; }
+    function isRoad(x, z) { return x >= 0 && z >= 0 && x < GRID_SIZE && z < GRID_SIZE && grid[x][z] === 1; }
+    function isCrossing(x, z) { return !!(roadExtras.get(key(x, z))?.crossing); }
+    function isInBounds(tx, tz, w = 1, h = 1) { return tx >= 0 && tz >= 0 && tx + w <= GRID_SIZE && tz + h <= GRID_SIZE; }
+    function isAreaFree(tx, tz, w, h) {
+      for (let dx = 0; dx < w; dx++) for (let dz = 0; dz < h; dz++) if (grid[tx + dx][tz + dz] !== 0) return false;
+      return true;
+    }
+    function touchesRoad(tx, tz, w, h) {
+      for (let dx = 0; dx < w; dx++) if (isRoad(tx + dx, tz - 1) || isRoad(tx + dx, tz + h)) return true;
+      for (let dz = 0; dz < h; dz++) if (isRoad(tx - 1, tz + dz) || isRoad(tx + w, tz + dz)) return true;
+      return false;
+    }
+    // Les bâtiments peuvent être reculés d'une case par rapport à la route :
+    // la case intermédiaire devient un jardin de façade avec chemin d'accès.
+    function hasRoadFrontage(tx, tz, w, h) {
+      if (touchesRoad(tx, tz, w, h)) return true;
+      for (let dx = -1; dx <= w; dx++) {
+        if (isRoad(tx + dx, tz - 2) || isRoad(tx + dx, tz + h + 1)) return true;
+      }
+      for (let dz = -1; dz <= h; dz++) {
+        if (isRoad(tx - 2, tz + dz) || isRoad(tx + w + 1, tz + dz)) return true;
+      }
+      return false;
+    }
+    function getNeighbors(x, z) {
+      const n = [];
+      for (let d = 0; d < 4; d++) if (isRoad(x + DIRS[d].dx, z + DIRS[d].dz)) n.push(d);
+      return n;
+    }
+
+    // ===== DAY/NIGHT (~12 min per day) =====
+    function updateDayNight() {
+      gameHour += 0.00055;
+      if (gameHour >= 24) {
+        gameHour -= 24;
+        advanceDay();
+      }
+      const h = Math.floor(gameHour), m = Math.floor((gameHour % 1) * 60);
+      clockEl.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+      const wasNight = isNight;
+      isNight = (gameHour >= 20 || gameHour < 6);
+      let sky, amb, sunInt, fogCol;
+      if (gameHour >= 6 && gameHour < 8) {
+        const t = (gameHour - 6) / 2;
+        sky = lerpColor(0x0a0f1a, 0x87ceeb, t); amb = 0.25 + t * 0.45; sunInt = 0.2 + t * 0.9; fogCol = sky;
+      } else if (gameHour >= 8 && gameHour < 18) {
+        sky = 0x87ceeb; amb = 0.7; sunInt = 1.1; fogCol = 0x87ceeb;
+      } else if (gameHour >= 18 && gameHour < 20) {
+        const t = (gameHour - 18) / 2;
+        sky = lerpColor(0x87ceeb, 0x0a0f1a, t); amb = 0.7 - t * 0.45; sunInt = 1.1 - t * 0.9; fogCol = sky;
+      } else {
+        sky = 0x0a0f1a; amb = 0.22; sunInt = 0.12; fogCol = 0x0a0f1a;
+      }
+      scene.background.setHex(sky); scene.fog.color.setHex(fogCol);
+      ambient.intensity = amb; sun.intensity = sunInt;
+      if (wasNight !== isNight) {
+        for (const w of windowMeshes) if (w?.material) w.material.color.setHex(isNight ? COLORS.windowNight : COLORS.window);
+        for (const car of cars) if (car.headlights) car.headlights.forEach(h => h.visible = isNight);
+      }
+    }
+    function lerpColor(a, b, t) {
+      const ar=(a>>16)&255,ag=(a>>8)&255,ab=a&255, br=(b>>16)&255,bg=(b>>8)&255,bb=b&255;
+      return (Math.round(ar+(br-ar)*t)<<16)|(Math.round(ag+(bg-ag)*t)<<8)|Math.round(ab+(bb-ab)*t);
+    }
+
+    // ===== ROUTES À LARGEUR RÉELLEMENT DIFFÉRENCIÉE =====
+    function updateRoadMesh(x, z) {
+      for (let i = roadsGroup.children.length - 1; i >= 0; i--) {
+        const c = roadsGroup.children[i];
+        if (c.userData?.tx === x && c.userData?.tz === z) {
+          roadsGroup.remove(c);
+          if (c.geometry) c.geometry.dispose();
+          if (c.material) { if (Array.isArray(c.material)) c.material.forEach(m=>m.dispose()); else c.material.dispose(); }
+        }
+      }
+      if (!isRoad(x, z)) return;
+      const hasN = isRoad(x, z + 1), hasS = isRoad(x, z - 1);
+      const hasE = isRoad(x + 1, z), hasW = isRoad(x - 1, z);
+      const extra = roadExtras.get(key(x, z)) || {};
+      const type = ROAD_TYPES[extra.roadType] ? extra.roadType : 'street';
+      const road = ROAD_TYPES[type], cx=x*TILE+TILE/2, cz=z*TILE+TILE/2;
+      const vertical = (hasN || hasS) && !(hasE || hasW);
+      const horizontal = (hasE || hasW) && !(hasN || hasS);
+      const addTileMesh = (geo, material, px, pz, y=0.13) => {
+        const m=new THREE.Mesh(geo,material); m.position.set(px,y,pz); m.userData={tx:x,tz:z}; roadsGroup.add(m); return m;
+      };
+      const roadMat = new THREE.MeshLambertMaterial({color:road.color});
+      // Straight roads use their actual width; junctions combine both directions.
+      if (vertical) addTileMesh(new THREE.BoxGeometry(road.width,0.26,TILE*0.99),roadMat,cx,cz);
+      else if (horizontal) addTileMesh(new THREE.BoxGeometry(TILE*0.99,0.26,road.width),roadMat,cx,cz);
+      else {
+        addTileMesh(new THREE.BoxGeometry(road.width,0.26,TILE*0.99),roadMat,cx,cz);
+        addTileMesh(new THREE.BoxGeometry(TILE*0.99,0.26,road.width),new THREE.MeshLambertMaterial({color:road.color}),cx,cz);
+      }
+      // Sidewalks run alongside the carriageway instead of occupying the whole tile edge.
+      const swMat=new THREE.MeshLambertMaterial({color:COLORS.sidewalk}), sw=0.48;
+      if (vertical || (!horizontal && (hasN||hasS))) {
+        for (const side of [-1,1]) addTileMesh(new THREE.BoxGeometry(sw,0.20,TILE*0.98),swMat,cx+side*(road.width/2+sw/2),cz,0.18);
+      }
+      if (horizontal || (!vertical && (hasE||hasW))) {
+        for (const side of [-1,1]) addTileMesh(new THREE.BoxGeometry(TILE*0.98,0.20,sw),new THREE.MeshLambertMaterial({color:COLORS.sidewalk}),cx,cz+side*(road.width/2+sw/2),0.18);
+      }
+      // Lane markings are scaled to the selected road type. All vehicles keep right.
+      const markingY=0.275;
+      if (vertical || (!horizontal && (hasN||hasS))) {
+        if (road.lanes >= 4) addTileMesh(new THREE.BoxGeometry(0.12,0.025,TILE*0.72),new THREE.MeshBasicMaterial({color:road.line}),cx,cz,markingY);
+        if (road.lanes >= 6) for (const side of [-1,1]) addTileMesh(new THREE.BoxGeometry(0.07,0.025,TILE*0.72),new THREE.MeshBasicMaterial({color:0xf8fafc}),cx+side*road.width*0.34,cz,markingY);
+        if (road.lanes === 2 && (hasN||hasS)) addTileMesh(new THREE.BoxGeometry(0.08,0.025,TILE*0.35),new THREE.MeshBasicMaterial({color:0xd4d4d8}),cx,cz,markingY);
+      }
+      if (horizontal || (!vertical && (hasE||hasW))) {
+        if (road.lanes >= 4) addTileMesh(new THREE.BoxGeometry(TILE*0.72,0.025,0.12),new THREE.MeshBasicMaterial({color:road.line}),cx,cz,markingY);
+        if (road.lanes >= 6) for (const side of [-1,1]) addTileMesh(new THREE.BoxGeometry(TILE*0.72,0.025,0.07),new THREE.MeshBasicMaterial({color:0xf8fafc}),cx,cz+side*road.width*0.34,markingY);
+        if (road.lanes === 2 && (hasE||hasW)) addTileMesh(new THREE.BoxGeometry(TILE*0.35,0.025,0.08),new THREE.MeshBasicMaterial({color:0xd4d4d8}),cx,cz,markingY);
+      }
+      if (extra.crossing) drawCrossing(x, z);
+    }
+    function refreshIntersection(x,z) {
+      for (let i=intersectionsGroup.children.length-1;i>=0;i--) {
+        const o=intersectionsGroup.children[i];
+        if (o.userData?.tx===x && o.userData?.tz===z) intersectionsGroup.remove(o);
+      }
+      if (!isRoad(x,z)) return;
+      const degree=DIRS.reduce((n,d)=>n+(isRoad(x+d.dx,z+d.dz)?1:0),0);
+      if (degree < 3) return;
+      // Subtle junction marking at the center, without changing the road surface.
+      const mark = new THREE.Mesh(
+        new THREE.CircleGeometry(0.62,16),
+        new THREE.MeshBasicMaterial({color:0x52525b,transparent:true,opacity:0.45,side:THREE.DoubleSide})
+      );
+      mark.rotation.x=-Math.PI/2;
+      mark.position.set(x*TILE+TILE/2,0.29,z*TILE+TILE/2);
+      mark.userData={tx:x,tz:z,type:'intersection'};
+      intersectionsGroup.add(mark);
+    }
+    function refreshRoadAndNeighbors(x, z) {
+      updateRoadMesh(x, z);
+      refreshIntersection(x,z);
+      for (const d of DIRS) {
+        updateRoadMesh(x + d.dx, z + d.dz);
+        refreshIntersection(x + d.dx, z + d.dz);
+      }
+      if (typeof refreshPowerNetwork === 'function') refreshPowerNetwork();
+    }
+
+    // ===== CROSSING — oriented across the road =====
+    function drawCrossing(x, z) {
+      for (let i = decorGroup.children.length - 1; i >= 0; i--) {
+        const c = decorGroup.children[i];
+        if (c.userData?.type === 'crossing' && c.userData.tx === x && c.userData.tz === z) decorGroup.remove(c);
+      }
+      const hasN = isRoad(x, z + 1), hasS = isRoad(x, z - 1);
+      const hasE = isRoad(x + 1, z), hasW = isRoad(x - 1, z);
+      // Invert orientation: stripes must cross the roadway
+      const verticalRoad = (hasN || hasS) && !(hasE || hasW);
+      const horizontalRoad = (hasE || hasW) && !(hasN || hasS);
+      // Stripes cross the main road axis; intersections default to north-south.
+      const acrossNS = verticalRoad || (!horizontalRoad);
+
+      const stripeMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+      const count = 6;
+      for (let i = 0; i < count; i++) {
+        let geo, px, pz;
+        if (acrossNS) {
+          // Stripes across N-S road → bars East-West
+          geo = new THREE.BoxGeometry(TILE * 0.7, 0.3, 0.45);
+          px = x * TILE + TILE / 2;
+          pz = z * TILE + TILE * 0.18 + i * (TILE * 0.64 / (count - 1));
+        } else {
+          // Stripes across E-W road → bars North-South
+          geo = new THREE.BoxGeometry(0.45, 0.3, TILE * 0.7);
+          px = x * TILE + TILE * 0.18 + i * (TILE * 0.64 / (count - 1));
+          pz = z * TILE + TILE / 2;
+        }
+        const stripe = new THREE.Mesh(geo, stripeMat);
+        stripe.position.set(px, 0.2, pz);
+        stripe.userData = { type: 'crossing', tx: x, tz: z };
+        decorGroup.add(stripe);
+      }
+    }
+    function placeCrossing(tx, tz) {
+      if (!isRoad(tx, tz)) return;
+      let extra = roadExtras.get(key(tx, tz)) || {};
+      extra.crossing = true;
+      roadExtras.set(key(tx, tz), extra);
+      drawCrossing(tx, tz);
+    }
+
+    // ===== TRAFFIC LIGHT =====
+    function createTrafficLightMesh() {
+      const g = new THREE.Group();
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.18, 5.2, 10), new THREE.MeshStandardMaterial({ color: 0x52525b, metalness: 0.55, roughness: 0.45 }));
+      pole.position.y = 2.6; g.add(pole);
+      const box = new THREE.Mesh(new THREE.BoxGeometry(1.18, 3.0, 0.78), new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.2, roughness: 0.35 }));
+      box.position.set(0, 4.9, 0.08); g.add(box);
+      const lenses = [];
+      const baseCols = [0xff2929, 0xffa51f, 0x20f06b]; // top to bottom: red, amber, green
+      for (let i = 0; i < 3; i++) {
+        const mat = new THREE.MeshStandardMaterial({
+          color: baseCols[i], emissive: baseCols[i], emissiveIntensity: 0.08,
+          roughness: 0.25, metalness: 0.0
+        });
+        const lens = new THREE.Mesh(new THREE.SphereGeometry(0.34, 16, 12), mat);
+        lens.scale.set(1, 0.82, 0.42);
+        lens.position.set(0, 5.75 - i * 0.82, 0.53);
+        g.add(lens); lenses.push(lens);
+        const rim = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.055, 8, 20), new THREE.MeshStandardMaterial({ color: 0x374151, metalness: 0.35, roughness: 0.45 }));
+        rim.position.copy(lens.position); rim.rotation.x = Math.PI / 2; g.add(rim);
+      }
+      // A small visor makes the signal readable from an elevated camera.
+      const visor = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.16, 0.95), new THREE.MeshStandardMaterial({ color: 0x27272a, metalness: 0.2 }));
+      visor.position.set(0, 6.35, 0.04); g.add(visor);
+      g.userData.lights = lenses;
+      return g;
+    }
+    // European-style signal controller: NS green 8s, amber 3s, all-red 1s,
+    // EW green 8s, amber 3s, all-red 1s (24s total at 60fps).
+    let globalLightTimer = 0;
+    const NS_GREEN = 480, AMBER = 180, ALL_RED = 60;
+    const LIGHT_CYCLE = NS_GREEN + AMBER + ALL_RED + NS_GREEN + AMBER + ALL_RED;
+
+    function getRoadAxis(x, z) {
+      // Prefer pure corridor direction; at full 4-way default to NS for display only
+      const hasN = isRoad(x, z + 1), hasS = isRoad(x, z - 1);
+      const hasE = isRoad(x + 1, z), hasW = isRoad(x - 1, z);
+      const ns = (hasN ? 1 : 0) + (hasS ? 1 : 0);
+      const ew = (hasE ? 1 : 0) + (hasW ? 1 : 0);
+      if (ns > ew) return 'NS';
+      if (ew > ns) return 'EW';
+      return 'NS'; // intersection: display defaults to NS (cars use their own direction)
+    }
+
+    function getGlobalPhase() {
+      const t = globalLightTimer % LIGHT_CYCLE;
+      if (t < NS_GREEN) return 0;                         // NS green
+      if (t < NS_GREEN + AMBER) return 1;               // NS amber
+      if (t < NS_GREEN + AMBER + ALL_RED) return 2;     // all red
+      if (t < NS_GREEN + AMBER + ALL_RED + NS_GREEN) return 3; // EW green
+      if (t < NS_GREEN + AMBER + ALL_RED + NS_GREEN + AMBER) return 4; // EW amber
+      return 5;                                          // all red
+    }
+
+    function phaseForAxis(axis) {
+      // 0=red, 1=amber, 2=green. During clearance both axes are red.
+      const g = getGlobalPhase();
+      if (g === 2 || g === 5) return 0;
+      if (axis === 'NS') return g === 0 ? 2 : g === 1 ? 1 : 0;
+      return g === 3 ? 2 : g === 4 ? 1 : 0;
+    }
+
+    function carTravelAxis(dir) {
+      // dir 0/2 = North/South → NS axis ; dir 1/3 = East/West → EW axis
+      return (dir === 0 || dir === 2) ? 'NS' : 'EW';
+    }
+
+    // Should this car stop for a traffic light?
+    // Rule: once engaged in the intersection (on light tile past stop-line), always clear it.
+    function shouldStopForLight(car) {
+      const phase = phaseForAxis(carTravelAxis(car.dir));
+      if (phase === 2) return false; // green → go
+
+      const onLightNow = !!(roadExtras.get(key(car.x, car.z))?.light);
+      // Already past the stop line on the light tile → finish crossing, never stop mid-intersection
+      if (onLightNow && car.progress > 0.35) return false;
+
+      const d = DIRS[car.dir];
+      // Look 1–2 tiles ahead for a light
+      for (let i = 1; i <= 2; i++) {
+        const tx = car.x + d.dx * i;
+        const tz = car.z + d.dz * i;
+        if (!isRoad(tx, tz)) break;
+        if (roadExtras.get(key(tx, tz))?.light) {
+          if (phase === 0) return true; // red ahead
+          // orange: stop only if close (next tile) and not already committed
+          if (phase === 1 && i === 1 && car.progress > 0.25) return true;
+          if (phase === 1 && i === 2) return true;
+          return false;
+        }
+      }
+      // On light tile but still before stop line
+      if (onLightNow && car.progress <= 0.35) {
+        if (phase === 0 || phase === 1) return true;
+      }
+      return false;
+    }
+
+    function placeTrafficLight(tx, tz) {
+      if (!isRoad(tx, tz)) return false;
+      let extra = roadExtras.get(key(tx, tz));
+      if (!extra) extra = {};
+      if (extra.light) return false;
+
+      // Four signal heads around the junction, one facing each approach.
+      // Each approach displays the phase for the direction of travel it controls.
+      const assembly = new THREE.Group();
+      assembly.position.set(tx * TILE + TILE / 2, 0, tz * TILE + TILE / 2);
+      assembly.userData = { type: 'trafficlight', tx, tz, lights: [] };
+      const heads = [
+        { x: -2.65, z: -2.65, yaw: Math.PI, axis: 'NS' },
+        { x:  2.65, z:  2.65, yaw: 0,       axis: 'NS' },
+        { x: -2.65, z:  2.65, yaw: Math.PI / 2, axis: 'EW' },
+        { x:  2.65, z: -2.65, yaw: -Math.PI / 2, axis: 'EW' }
+      ];
+      for (const h of heads) {
+        const head = createTrafficLightMesh();
+        head.position.set(h.x, 0, h.z);
+        head.rotation.y = h.yaw;
+        assembly.add(head);
+        for (const lens of head.userData.lights || []) {
+          assembly.userData.lights.push({ lens, axis: h.axis, colorIndex: (head.userData.lights || []).indexOf(lens) });
+        }
+      }
+      decorGroup.add(assembly);
+      extra.light = assembly;
+      extra.axis = getRoadAxis(tx, tz);
+      extra.phase = phaseForAxis(extra.axis);
+      roadExtras.set(key(tx, tz), extra);
+      return true;
+    }
+
+    function updateTrafficLights() {
+      globalLightTimer++;
+      const dim = [0x321010, 0x39240b, 0x0b2d19];
+      const bright = [0xff2929, 0xffa51f, 0x20f06b];
+      for (const [, extra] of roadExtras) {
+        const signal = extra?.light;
+        if (!signal?.userData?.lights) continue;
+        const signals = signal.userData.lights;
+        for (const item of signals) {
+          const lens = item.lens;
+          if (!lens?.material) continue;
+          const phase = phaseForAxis(item.axis); // 0 red, 1 amber, 2 green
+          const colorIndex = item.colorIndex;
+          const lit = phase === colorIndex;
+          lens.material.color.setHex(lit ? bright[colorIndex] : dim[colorIndex]);
+          if (lens.material.emissive) lens.material.emissive.setHex(lit ? bright[colorIndex] : dim[colorIndex]);
+          if (lens.material.emissiveIntensity !== undefined) lens.material.emissiveIntensity = lit ? 1.7 : 0.03;
+        }
+      }
+    }
+
+    // ===== CARS — use full network =====
+    function createCarMesh(color) {
+      // Compact low-poly 3D car: shaped body, separate bonnet/cabin, glass,
+      // bumpers, mirrors, headlights, rear lamps and rotating cylindrical wheels.
+      const g = new THREE.Group();
+      const mat = (c, roughness=0.68, metalness=0.04) => new THREE.MeshStandardMaterial({ color:c, roughness, metalness });
+      const paint = mat(color, 0.34, 0.22);
+      const darkPaint = mat(0x26313c, 0.48, 0.12);
+      const glass = new THREE.MeshStandardMaterial({ color:0x8bd3f7, roughness:0.2, metalness:0.12, transparent:true, opacity:0.92 });
+      const glassDark = mat(0x23445a, 0.22, 0.15);
+      const rubber = mat(0x17191d, 0.94, 0);
+      const rim = mat(0xb8c2cc, 0.32, 0.72);
+      const headMat = new THREE.MeshStandardMaterial({ color:0xfff4cf, emissive:0xffd977, emissiveIntensity:0.25, roughness:0.25 });
+      const tailMat = new THREE.MeshStandardMaterial({ color:0xe32636, emissive:0x7f0710, emissiveIntensity:0.3 });
+      const box = (w,h,d,material,x,y,z, bevelScale=1) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w*bevelScale,h*bevelScale,d*bevelScale), material);
+        m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true; g.add(m); return m;
+      };
+      // Main chassis and upper body, oriented forward toward -Z.
+      box(1.62,0.62,3.15,paint,0,0.68,0);
+      box(1.48,0.28,1.05,paint,0,0.88,-1.02);
+      box(1.44,0.22,0.72,paint,0,0.86,1.12);
+      box(1.46,0.12,2.7,darkPaint,0,0.36,0.02);
+      // Cabin with dark window band and roof.
+      box(1.28,0.78,1.62,glassDark,0,1.27,-0.22);
+      box(1.18,0.14,1.4,paint,0,1.72,-0.2);
+      // Front and rear windshield, plus side window panels.
+      const windshield = box(1.12,0.55,0.07,glass,0,1.31,-1.055);
+      windshield.rotation.x=-0.18;
+      const rearGlass = box(1.1,0.48,0.07,glass,0,1.3,0.61); rearGlass.rotation.x=0.2;
+      box(0.055,0.47,0.82,glass,0.655,1.31,-0.22);
+      box(0.055,0.47,0.82,glass,-0.655,1.31,-0.22);
+      // Side mirrors.
+      box(0.19,0.1,0.22,darkPaint,0.82,1.08,-0.76);
+      box(0.19,0.1,0.22,darkPaint,-0.82,1.08,-0.76);
+      // Bumpers and grille.
+      box(1.42,0.18,0.16,darkPaint,0,0.49,-1.62);
+      box(1.42,0.18,0.16,darkPaint,0,0.49,1.62);
+      box(0.58,0.18,0.035,mat(0x101820,0.5,0.2),0,0.69,-1.705);
+      // Four wheels with metallic hubs; cylinders are rotated onto the axle.
+      const wheelPositions=[[-0.82,0.42,-1.02],[0.82,0.42,-1.02],[-0.82,0.42,1.02],[0.82,0.42,1.02]];
+      for (const [x,y,z] of wheelPositions) {
+        const tire=new THREE.Mesh(new THREE.CylinderGeometry(0.34,0.34,0.22,12),rubber);
+        tire.rotation.z=Math.PI/2; tire.position.set(x,y,z); tire.castShadow=true; g.add(tire);
+        const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,0.235,10),rim);
+        hub.rotation.z=Math.PI/2; hub.position.set(x+(x>0?0.015:-0.015),y,z); g.add(hub);
+        const hubCore=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.24,8),darkPaint);
+        hubCore.rotation.z=Math.PI/2; hubCore.position.set(x+(x>0?0.02:-0.02),y,z); g.add(hubCore);
+      }
+      for (const x of [-0.48,0.48]) {
+        box(0.28,0.16,0.06,headMat,x,0.76,-1.69);
+        box(0.25,0.15,0.06,tailMat,x,0.73,1.64);
+      }
+      // License plate and door lines add scale and visual clarity.
+      box(0.34,0.09,0.025,mat(0xf1f5f9),0,0.53,-1.72);
+      for (const x of [-0.72,0.72]) box(0.025,0.34,0.025,darkPaint,x,0.78,0.02);
+      g.userData.headlights = g.children.filter(o => o.material === headMat);
+      return g;
+    }
+    function getRightOffset(dir, x=0, z=0) {
+      const R = Math.min(2.15, ROAD_TYPES[roadTypeAt(x,z)].width * 0.28);
+      if (dir === 0) return { ox: R, oz: 0 };
+      if (dir === 1) return { ox: 0, oz: -R };
+      if (dir === 2) return { ox: -R, oz: 0 };
+      return { ox: 0, oz: R };
+    }
+    function chooseNextDir(x, z, currentDir) {
+      const neighbors = getNeighbors(x, z);
+      if (!neighbors.length) return currentDir;
+      // Prefer straight, then right, then left. Never make an in-place U-turn.
+      if (neighbors.includes(currentDir)) return currentDir;
+      const right = (currentDir + 1) % 4;
+      if (neighbors.includes(right) && Math.random() > 0.3) return right;
+      const left = (currentDir + 3) % 4;
+      if (neighbors.includes(left)) return left;
+      if (neighbors.includes(currentDir)) return currentDir;
+      // At a dead end, choose another available direction only if it is not a U-turn.
+      const options = neighbors.filter(d => d !== (currentDir + 2) % 4);
+      if (options.length) return options[Math.floor(Math.random() * options.length)];
+      return currentDir;
+    }
+    function carWorldPos(car) {
+      const d = DIRS[car.dir], offset = getRightOffset(car.dir,car.x,car.z);
+      const fromX = car.x * TILE + TILE / 2 + offset.ox;
+      const fromZ = car.z * TILE + TILE / 2 + offset.oz;
+      const toX = (car.x + d.dx) * TILE + TILE / 2 + offset.ox;
+      const toZ = (car.z + d.dz) * TILE + TILE / 2 + offset.oz;
+      return { x: fromX + (toX - fromX) * car.progress, z: fromZ + (toZ - fromZ) * car.progress };
+    }
+    function vehicleWorldPos(vehicle) {
+      // Both cars and trucks follow the same lane-centre calculation.
+      return carWorldPos(vehicle);
+    }
+    function isBlockedByVehicle(vehicle, vehicleType='car') {
+      const myPos = vehicleWorldPos(vehicle);
+      const allVehicles = cars.concat(trucks);
+      const minGap = vehicleType === 'truck' ? 4.8 : 3.6;
+      for (const other of allVehicles) {
+        if (other === vehicle || other.dir !== vehicle.dir) continue;
+        const oPos = vehicleWorldPos(other);
+        const dx = oPos.x - myPos.x, dz = oPos.z - myPos.z;
+        const fwd = DIRS[vehicle.dir];
+        const along = dx * fwd.dx + dz * fwd.dz;
+        const side = Math.abs(dx * fwd.dz - dz * fwd.dx);
+        // Same lane only: never overtake and keep a larger gap behind trucks.
+        if (along > 0.35 && along < minGap && side < 1.55) return true;
+      }
+      return false;
+    }
+    function isBlockedByCar(car) { return isBlockedByVehicle(car, 'car'); }
+    function spawnCar(startX, startZ) {
+      const neighbors = getNeighbors(startX, startZ);
+      if (!neighbors.length) return;
+      const dir = neighbors[Math.floor(Math.random() * neighbors.length)];
+      const color = COLORS.car[Math.floor(Math.random() * COLORS.car.length)];
+      const mesh = createCarMesh(color);
+      carsGroup.add(mesh);
+      const offset = getRightOffset(dir,startX,startZ);
+      mesh.position.set(startX * TILE + TILE / 2 + offset.ox, 0, startZ * TILE + TILE / 2 + offset.oz);
+      mesh.rotation.y = DIRS[dir].yaw;
+      const headlights = mesh.userData.headlights || [];
+      headlights.forEach(h => h.visible = isNight);
+      cars.push({
+        mesh, x: startX, z: startZ, dir,
+        progress: Math.random() * 0.5,
+        speed: (0.012 + Math.random() * 0.005) * 2,
+        baseSpeed: (0.012 + Math.random() * 0.005) * 2,
+        headlights
+      });
+    }
+    function updateCars() {
+      for (const car of cars) {
+        const nextX = car.x + DIRS[car.dir].dx, nextZ = car.z + DIRS[car.dir].dz;
+        let mustStop = false;
+
+        // Traffic light: stop before the line; if already engaged, clear the intersection
+        if (shouldStopForLight(car)) mustStop = true;
+        if (isBlockedByCar(car)) mustStop = true;
+        // If the road ends, slow down rather than reversing on the spot.
+        if (!isRoad(nextX, nextZ)) {
+          const alternatives = getNeighbors(car.x, car.z).filter(d => d !== (car.dir + 2) % 4);
+          if (!alternatives.length) mustStop = true;
+        }
+
+        if (mustStop) car.speed = Math.max(0, car.speed - 0.007);
+        else car.speed = Math.min(car.baseSpeed * roadSpeedFactor(car.x,car.z), car.speed + 0.0035);
+        if (car.speed <= 0.0005) continue;
+
+        car.progress += car.speed;
+        if (car.progress >= 1) {
+          if (isRoad(nextX, nextZ)) {
+            car.x = nextX; car.z = nextZ; car.progress = 0;
+            car.dir = chooseNextDir(car.x, car.z, car.dir);
+          } else {
+            const alternatives = getNeighbors(car.x, car.z).filter(d => d !== (car.dir + 2) % 4);
+            if (alternatives.length) {
+              car.dir = chooseNextDir(car.x, car.z, car.dir);
+              car.progress = 0;
+            } else {
+              car.progress = 0.94;
+              car.speed = 0;
+            }
+          }
+        }
+        const pos = carWorldPos(car);
+        car.mesh.position.x = pos.x; car.mesh.position.z = pos.z;
+        car.mesh.rotation.y = DIRS[car.dir].yaw;
+      }
+    }
+
+    // ===== PEOPLE on sidewalks, use whole network =====
+    // Personnages 3D réalistes stylisés, légers pour les appareils Android.
+    const citizenPalette = {
+      skin: [0xf1c7a5, 0xd9a078, 0xb97850, 0x8d573b, 0x6b422e],
+      clothes: [0x2563eb, 0xdc2626, 0x16a34a, 0x7c3aed, 0xf59e0b, 0x0f766e, 0x334155, 0xe5e7eb, 0x9333ea, 0x92400e],
+      trousers: [0x1e293b, 0x334155, 0x475569, 0x64748b, 0x292524, 0x1d4ed8]
+    };
+    const citizenGeo = {
+      head: new THREE.SphereGeometry(0.17, 8, 6),
+      torso: new THREE.CapsuleGeometry(0.17, 0.34, 3, 6),
+      arm: new THREE.CapsuleGeometry(0.055, 0.26, 2, 5),
+      leg: new THREE.CapsuleGeometry(0.065, 0.28, 2, 5),
+      shoe: new THREE.BoxGeometry(0.12, 0.07, 0.19),
+      hair: new THREE.SphereGeometry(0.175, 8, 5),
+      bag: new THREE.BoxGeometry(0.18, 0.23, 0.09)
+    };
+    function makeCitizenMaterial(color) { return new THREE.MeshLambertMaterial({ color }); }
+    function createPersonMesh() {
+      const g = new THREE.Group();
+      const skin = citizenPalette.skin[Math.floor(Math.random()*citizenPalette.skin.length)];
+      const shirt = citizenPalette.clothes[Math.floor(Math.random()*citizenPalette.clothes.length)];
+      const pants = citizenPalette.trousers[Math.floor(Math.random()*citizenPalette.trousers.length)];
+      const skinMat = makeCitizenMaterial(skin), shirtMat = makeCitizenMaterial(shirt), pantsMat = makeCitizenMaterial(pants);
+      const hairMat = makeCitizenMaterial([0x211b18,0x493326,0x6b4423,0x9a6b3f,0x262626][Math.floor(Math.random()*5)]);
+      const torso = new THREE.Mesh(citizenGeo.torso, shirtMat); torso.position.y = 0.91; g.add(torso);
+      const head = new THREE.Mesh(citizenGeo.head, skinMat); head.position.y = 1.34; g.add(head);
+      const hair = new THREE.Mesh(citizenGeo.hair, hairMat); hair.scale.set(1,0.55,1); hair.position.set(0,1.43,-0.015); g.add(hair);
+      // Bras et jambes articulés : animation discrète au rythme de la marche.
+      const arms = [], legs = [];
+      for (const side of [-1,1]) {
+        const armPivot = new THREE.Group(); armPivot.position.set(side*0.21,1.08,0); g.add(armPivot);
+        const arm = new THREE.Mesh(citizenGeo.arm, skinMat); arm.position.y=-0.19; armPivot.add(arm); arms.push(armPivot);
+        const legPivot = new THREE.Group(); legPivot.position.set(side*0.09,0.62,0); g.add(legPivot);
+        const leg = new THREE.Mesh(citizenGeo.leg, pantsMat); leg.position.y=-0.19; legPivot.add(leg);
+        const shoe = new THREE.Mesh(citizenGeo.shoe, makeCitizenMaterial(0x292524)); shoe.position.set(0,-0.37,0.045); legPivot.add(shoe); legs.push(legPivot);
+      }
+      // Une petite sacoche sur une partie des habitants apporte de la variété visuelle.
+      if (Math.random() < 0.28) {
+        const bag = new THREE.Mesh(citizenGeo.bag, makeCitizenMaterial(0x7c4a2d));
+        bag.position.set(0.23,0.82,-0.08); g.add(bag);
+      }
+      g.scale.setScalar(0.82 + Math.random()*0.18);
+      g.userData.walkParts = { arms, legs, phase: Math.random()*Math.PI*2 };
+      g.userData.appearance = { skin, shirt, pants };
+      return g;
+    }
+    function sidewalkPos(rx, rz, side) {
+      const cx = rx * TILE + TILE / 2, cz = rz * TILE + TILE / 2;
+      // Le trottoir est placé à l'extérieur de la chaussée réelle, selon la largeur de la route.
+      const roadWidth = ROAD_TYPES[roadTypeAt(rx, rz)].width;
+      const sidewalkOffset = roadWidth / 2 + 0.48 / 2 + 0.10;
+      const o = [
+        { x: 0, z: sidewalkOffset }, { x: 0, z: -sidewalkOffset },
+        { x: sidewalkOffset, z: 0 }, { x: -sidewalkOffset, z: 0 }
+      ][side % 4];
+      return { x: cx + o.x, z: cz + o.z };
+    }
+    function spawnPeople(tx, tz, w, h, count) {
+      count = Math.min(count, 6);
+      const roads = [];
+      for (let dx = -2; dx < w + 2; dx++)
+        for (let dz = -2; dz < h + 2; dz++)
+          if (isRoad(tx + dx, tz + dz)) roads.push({ x: tx + dx, z: tz + dz });
+      if (!roads.length) return;
+      for (let i = 0; i < count; i++) {
+        const person = createPersonMesh();
+        const r = roads[Math.floor(Math.random() * roads.length)];
+        const side = Math.floor(Math.random() * 4);
+        const pos = sidewalkPos(r.x, r.z, side);
+        person.position.set(pos.x, 0, pos.z);
+        peopleGroup.add(person);
+        people.push({
+          mesh: person, state: 'walk', roadX: r.x, roadZ: r.z, side,
+          t: Math.random() * 8, speed: 0.007 + Math.random() * 0.005,
+          crossProgress: 0, target: null
+        });
+      }
+    }
+    function updatePeople() {
+      for (const p of people) {
+        const parts = p.mesh.userData.walkParts;
+        if (parts) {
+          parts.phase += p.speed * 5;
+          const swing = p.state === 'walk' || p.state === 'crossing' ? Math.sin(parts.phase) * 0.42 : 0;
+          parts.legs[0].rotation.x = swing; parts.legs[1].rotation.x = -swing;
+          parts.arms[0].rotation.x = -swing * 0.7; parts.arms[1].rotation.x = swing * 0.7;
+        }
+        if (p.state === 'walk') {
+          p.t += p.speed;
+          const base = sidewalkPos(p.roadX, p.roadZ, p.side);
+          const alongX = (p.side === 0 || p.side === 1);
+          if (alongX) {
+            p.mesh.position.x = base.x + Math.sin(p.t) * 2.8;
+            p.mesh.position.z = base.z;
+            p.mesh.rotation.y = Math.cos(p.t) > 0 ? Math.PI / 2 : -Math.PI / 2;
+          } else {
+            p.mesh.position.x = base.x;
+            p.mesh.position.z = base.z + Math.sin(p.t) * 2.8;
+            p.mesh.rotation.y = Math.cos(p.t) > 0 ? 0 : Math.PI;
+          }
+          // Move along network
+          if (p.t > 10) {
+            p.t = 0;
+            // De temps en temps, un piéton entre dans un jardin adjacent puis revient au trottoir.
+            const gardenCandidates=[[0,-1],[1,0],[0,1],[-1,0]]
+              .map(([dx,dz])=>({x:p.roadX+dx,z:p.roadZ+dz}))
+              .filter(c=>gardenCells.has(key(c.x,c.z)));
+            if (gardenCandidates.length && Math.random()<0.30) {
+              p.gardenTarget=gardenCandidates[Math.floor(Math.random()*gardenCandidates.length)];
+              p.gardenTimer=0; p.gardenReturn=sidewalkPos(p.roadX,p.roadZ,p.side); p.state='gardenWalk';
+              continue;
+            }
+            const n = getNeighbors(p.roadX, p.roadZ);
+            if (n.length) {
+              const nd = n[Math.floor(Math.random() * n.length)];
+              const nextX = p.roadX + DIRS[nd].dx, nextZ = p.roadZ + DIRS[nd].dz;
+              // Conserver le même côté de la route : changer de côté sans passage piéton
+              // provoquait un saut visuel à travers la chaussée.
+              p.roadX = nextX; p.roadZ = nextZ;
+              if ((nd === 0 || nd === 1) && (p.side === 2 || p.side === 3)) p.side = p.side === 2 ? 0 : 1;
+              else if ((nd === 2 || nd === 3) && (p.side === 0 || p.side === 1)) p.side = p.side === 0 ? 2 : 3;
+            }
+          }
+          // Un piéton ne quitte jamais le trottoir pour rejoindre un passage éloigné.
+          // Il ne peut commencer une traversée que sur une case de route portant un passage.
+          if (isCrossing(p.roadX, p.roadZ) && Math.random() < 0.0012) {
+            const cx = p.roadX * TILE + TILE / 2, cz = p.roadZ * TILE + TILE / 2;
+            const hasN = isRoad(p.roadX, p.roadZ + 1), hasS = isRoad(p.roadX, p.roadZ - 1);
+            const hasE = isRoad(p.roadX + 1, p.roadZ), hasW = isRoad(p.roadX - 1, p.roadZ);
+            const acrossX = (hasN || hasS) && !(hasE || hasW);
+            p.crossAxis = acrossX ? 'x' : 'z';
+            // Approche depuis le bord du trottoir correspondant au passage.
+            const crossingOffset = ROAD_TYPES[roadTypeAt(p.roadX, p.roadZ)].width / 2 + 0.48 / 2 + 0.10;
+            p.crossStart = acrossX ? { x: cx + crossingOffset, z: cz } : { x: cx, z: cz + crossingOffset };
+            p.crossEnd = acrossX ? { x: cx - crossingOffset, z: cz } : { x: cx, z: cz - crossingOffset };
+            p.state = 'goto_cross';
+            p.target = { x: p.roadX, z: p.roadZ };
+          }
+        } else if (p.state === 'gardenWalk') {
+          // Les habitants peuvent quitter le trottoir et marcher sur les cases de jardin.
+          p.gardenTimer = (p.gardenTimer || 0) + 1;
+          if (!p.gardenTarget || !gardenCells.has(key(p.gardenTarget.x,p.gardenTarget.z))) {
+            p.state='walk'; p.gardenTarget=null; continue;
+          }
+          const gx=p.gardenTarget.x*TILE+TILE/2, gz=p.gardenTarget.z*TILE+TILE/2;
+          const dx=gx-p.mesh.position.x, dz=gz-p.mesh.position.z;
+          const dist=Math.hypot(dx,dz);
+          if (dist>0.16) {
+            const step=Math.min(0.042,dist);
+            p.mesh.position.x += dx/dist*step; p.mesh.position.z += dz/dist*step;
+            p.mesh.rotation.y=Math.atan2(dx,dz);
+          } else if (p.gardenTimer>150) {
+            const back=sidewalkPos(p.roadX,p.roadZ,p.side);
+            p.gardenReturn=back; p.state='gardenReturn';
+          } else if (Math.random()<0.025) {
+            const candidates=[[1,0],[-1,0],[0,1],[0,-1]].map(([ax,az])=>({x:p.gardenTarget.x+ax,z:p.gardenTarget.z+az})).filter(c=>gardenCells.has(key(c.x,c.z)));
+            if(candidates.length) p.gardenTarget=candidates[Math.floor(Math.random()*candidates.length)];
+          }
+        } else if (p.state === 'gardenReturn') {
+          const back=p.gardenReturn || sidewalkPos(p.roadX,p.roadZ,p.side);
+          const dx=back.x-p.mesh.position.x, dz=back.z-p.mesh.position.z, dist=Math.hypot(dx,dz);
+          if(dist>0.18){const step=Math.min(0.09,dist);p.mesh.position.x+=dx/dist*step;p.mesh.position.z+=dz/dist*step;p.mesh.rotation.y=Math.atan2(dx,dz);}
+          else {p.mesh.position.x=back.x;p.mesh.position.z=back.z;p.state='walk';p.t=0;p.gardenTarget=null;p.gardenTimer=0;}
+        } else if (p.state === 'goto_cross') {
+          if (!p.target || !p.crossStart || !p.crossEnd || !isCrossing(p.target.x, p.target.z)) {
+            p.state = 'walk'; p.target = null; continue;
+          }
+          // Le trajet d'approche reste sur le trottoir; aucune diagonale à travers la chaussée.
+          const tx = p.crossStart.x, tz = p.crossStart.z;
+          p.mesh.position.x += (tx - p.mesh.position.x) * 0.08;
+          p.mesh.position.z += (tz - p.mesh.position.z) * 0.08;
+          if (Math.hypot(p.mesh.position.x - tx, p.mesh.position.z - tz) < 0.22) {
+            p.mesh.position.x = tx; p.mesh.position.z = tz;
+            p.state = 'crossing'; p.crossProgress = 0;
+          }
+        } else if (p.state === 'crossing') {
+          // Traversée rectiligne uniquement sur le passage piéton matérialisé.
+          if (!p.target || !p.crossStart || !p.crossEnd || !isCrossing(p.target.x, p.target.z)) {
+            p.state = 'walk'; p.target = null; p.crossStart = p.crossEnd = null; continue;
+          }
+          p.crossProgress += p.speed * 2.5;
+          const t = Math.min(1, p.crossProgress);
+          p.mesh.position.x = p.crossStart.x + (p.crossEnd.x - p.crossStart.x) * t;
+          p.mesh.position.z = p.crossStart.z + (p.crossEnd.z - p.crossStart.z) * t;
+          p.mesh.rotation.y = p.crossAxis === 'x' ? -Math.PI / 2 : 0;
+          if (p.crossProgress >= 1) {
+            p.state = 'walk'; p.roadX = p.target.x; p.roadZ = p.target.z;
+            p.side = p.crossAxis === 'x' ? 3 : 1; p.t = 0; p.target = null;
+            p.crossStart = p.crossEnd = null;
+          }
+        }
+      }
+    }
+
+    // ===== BUILDINGS =====
+    function addBuildingDetails(mesh, b) {
+      // Façades détaillées en 3D, avec style architectural distinct par catégorie.
+      const type = b.name === 'Petite maison' ? 'house' : (b.name === 'Immeuble moyen' ? 'medium' : 'large');
+      const cx = mesh.position.x, cz = mesh.position.z;
+      const width = b.w * TILE * 0.88, depth = b.h * TILE * 0.88;
+      const baseY = 0.12, wallTop = b.height;
+      const cream = new THREE.MeshStandardMaterial({ color: type === 'house' ? 0xe8d2ad : (type === 'medium' ? 0xd9d3c8 : 0xc8ced0), roughness: 0.88 });
+      const trim = new THREE.MeshStandardMaterial({ color: type === 'house' ? 0xf0e2c8 : 0xe9e2d5, roughness: 0.75 });
+      const roofMat = new THREE.MeshStandardMaterial({ color: type === 'house' ? 0xa94f2d : (type === 'medium' ? 0x777b7b : 0x686d70), roughness: 0.9 });
+      const glass = new THREE.MeshStandardMaterial({ color: isNight ? 0xffd89a : 0x4b6570, emissive: isNight ? 0x9b641b : 0x10191c, emissiveIntensity: isNight ? 0.45 : 0.08, roughness: 0.25 });
+      const shutter = new THREE.MeshStandardMaterial({ color: type === 'house' ? 0x8a6b4b : 0x5d5143, roughness: 0.8 });
+      const dark = new THREE.MeshStandardMaterial({ color: 0x3c3833, roughness: 0.65 });
+      const wood = new THREE.MeshStandardMaterial({ color: 0x765039, roughness: 0.9 });
+      function addBox(w,h,d,x,y,z,mat,parent=buildingsGroup) {
+        const o = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+        o.position.set(x,y,z); parent.add(o); return o;
+      }
+      function addWindow(x,y,z,face='front',scale=1) {
+        const ww = (type === 'house' ? 1.0 : 1.25) * scale;
+        const wh = (type === 'house' ? 1.45 : 1.25) * scale;
+        // façade orientée vers la route/front
+        addBox(ww+0.22*scale, wh+0.22*scale, 0.18, x,y,z,trim);
+        addBox(ww, wh, 0.07, x,y,z+0.105,glass);
+        addBox(0.07*scale,wh,0.045,x,y,z+0.15,dark);
+        addBox(ww,0.07*scale,0.045,x,y,z+0.15,dark);
+        if (type === 'house') {
+          addBox(0.22*scale,wh+0.12*scale,0.12,x-ww/2-0.13*scale,y,z+0.12,shutter);
+          addBox(0.22*scale,wh+0.12*scale,0.12,x+ww/2+0.13*scale,y,z+0.12,shutter);
+          for (let i=0;i<3;i++) {
+            addBox(0.18*scale,0.035,0.14,x-ww/2-0.13*scale,y-wh/2+(i+1)*wh/4,z+0.19, dark);
+            addBox(0.18*scale,0.035,0.14,x+ww/2+0.13*scale,y-wh/2+(i+1)*wh/4,z+0.19, dark);
+          }
+        }
+      }
+      if (type === 'house') {
+        // Socle en pierre, entrée et marches.
+        addBox(width+0.35,0.55,depth+0.35,cx,0.3,cz,trim);
+        addBox(1.0,2.7,0.22,cx,1.45,cz+depth/2+0.14,dark);
+        addBox(1.35,0.22,0.55,cx,0.12,cz+depth/2+0.55,trim);
+        addBox(1.15,0.18,0.42,cx,0.30,cz+depth/2+0.40,trim);
+        addBox(1.35,0.18,0.25,cx,2.95,cz+depth/2+0.12,trim);
+        const floors = Math.max(1, Math.floor(b.height/4));
+        for(let f=0; f<floors; f++) {
+          const y=3.2+f*3.0;
+          addWindow(cx-width*0.27,y,cz+depth/2+0.08,'front',0.82);
+          addWindow(cx+width*0.27,y,cz+depth/2+0.08,'front',0.82);
+        }
+        // Toiture à deux pans : deux grandes faces inclinées et faîtage.
+        const roofY = b.height+0.25, roofW=width+1.0, roofD=depth+0.8;
+        const roofL = new THREE.Mesh(new THREE.BoxGeometry(roofW*0.58,0.34,roofD),roofMat);
+        roofL.position.set(cx-0.35,roofY+0.65,cz); roofL.rotation.z=-0.42; buildingsGroup.add(roofL);
+        const roofR = new THREE.Mesh(new THREE.BoxGeometry(roofW*0.58,0.34,roofD),roofMat);
+        roofR.position.set(cx+0.35,roofY+0.65,cz); roofR.rotation.z=0.42; buildingsGroup.add(roofR);
+        addBox(0.32,0.38,roofD+0.15,cx,roofY+1.18,cz,roofMat);
+        // Reliefs de tuiles visibles sur les deux versants.
+        for(let i=0;i<5;i++) {
+          const z=cz-roofD*0.42+i*roofD*0.21;
+          const tileL=addBox(roofW*0.52,0.10,0.13,cx-0.36,roofY+0.85,z, new THREE.MeshStandardMaterial({color:0xd36b43,roughness:0.95})); tileL.rotation.z=-0.42;
+          const tileR=addBox(roofW*0.52,0.10,0.13,cx+0.36,roofY+0.85,z, new THREE.MeshStandardMaterial({color:0xc45a36,roughness:0.95})); tileR.rotation.z=0.42;
+        }
+        // Pignon triangulaire décoratif au-dessus de la façade.
+        const gable = new THREE.Mesh(new THREE.ConeGeometry(width*0.60,2.8,3),cream);
+        gable.rotation.y=Math.PI; gable.position.set(cx,b.height+0.85,cz+depth/2-0.03); buildingsGroup.add(gable);
+        addBox(0.75,0.95,0.12,cx,b.height+0.55,cz+depth/2+0.22,shutter);
+      } else {
+        // Immeubles : soubassement, étages, bandeaux, fenêtres répétées et toiture plate.
+        addBox(width+0.28,0.45,depth+0.28,cx,0.23,cz,trim);
+        const floors = Math.max(2, Math.floor(b.height/4.0));
+        const cols = type === 'medium' ? 2 : 3;
+        for(let f=0;f<floors;f++) {
+          const y=2.0+f*(b.height-3)/(floors);
+          addBox(width+0.10,0.12,depth+0.10,cx,y+1.0,cz,trim);
+          for(let c=0;c<cols;c++) {
+            const x=cx-width*0.34+(c*(width*0.68/Math.max(1,cols-1)));
+            addWindow(x,y,cz+depth/2+0.08,'front',type==='large'?0.78:0.72);
+          }
+          // Fenêtres latérales visibles en perspective.
+          const sideCount = type === 'large' ? 3 : 2;
+          for(let c=0;c<sideCount;c++) {
+            const z=cz-depth*0.30+c*(depth*0.60/Math.max(1,sideCount-1));
+            addBox(0.12,1.0,0.8,cx+width/2+0.08,y,z,glass);
+            addBox(0.10,1.12,0.10,cx+width/2+0.14,y,z,trim);
+          }
+        }
+        // Entrée centrale, marquise et toit avec acrotère.
+        addBox(1.15,2.35,0.18,cx,1.25,cz+depth/2+0.16,dark);
+        addBox(1.65,0.18,0.75,cx,2.55,cz+depth/2+0.36,trim);
+        addBox(width+0.18,0.45,depth+0.18,cx,b.height+0.22,cz,roofMat);
+        addBox(width+0.45,0.18,0.22,cx,b.height+0.52,cz+depth/2,trim);
+        if(type==='large') {
+          // Couronnement et petit volume technique pour donner une silhouette plus imposante.
+          addBox(width*0.42,1.2,depth*0.42,cx,b.height+1.05,cz,trim);
+          addBox(width*0.46,0.22,depth*0.46,cx,b.height+1.72,cz,roofMat);
+        }
+      }
+    }
+    function addPowerPlantDetails(mesh, b) {
+      // Deux cheminées industrielles et une salle des machines distinctives.
+      const x = mesh.position.x, z = mesh.position.z;
+      const stackMat = new THREE.MeshLambertMaterial({ color: 0x475569 });
+      const rimMat = new THREE.MeshLambertMaterial({ color: 0xf97316 });
+      for (const [dx, dz, height] of [[-7, -5, 10], [7, -5, 13]]) {
+        const stack = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 2, height, 12), stackMat);
+        stack.position.set(x + dx, b.height + height / 2 - 1, z + dz);
+        buildingsGroup.add(stack);
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(1.65, 1.65, 0.55, 12), rimMat);
+        rim.position.set(x + dx, b.height + height - 1, z + dz); buildingsGroup.add(rim);
+      }
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(7, 1.5, 0.25), new THREE.MeshLambertMaterial({color:0x0f172a}));
+      sign.position.set(x, 8, z + b.h * TILE * 0.44); buildingsGroup.add(sign);
+      mesh.userData.powerDecor = true;
+    }
+    function placeRoad(tx, tz, roadType = selectedRoadType) {
+      if (!isInBounds(tx, tz) || grid[tx][tz] !== 0) return;
+      grid[tx][tz] = 1;
+      const extra = roadExtras.get(key(tx,tz)) || {};
+      extra.roadType = ROAD_TYPES[roadType] ? roadType : 'street';
+      roadExtras.set(key(tx,tz),extra);
+      refreshRoadAndNeighbors(tx, tz);
+      refreshBuildingGardens();
+    }
+    function addHousingFacadeDetails(mesh, b, type) {
+      if (!['house','medium','large'].includes(type)) return;
+      const group = new THREE.Group();
+      const w = b.w * TILE * 0.88, d = b.h * TILE * 0.88, h = b.height;
+      const trim = new THREE.MeshLambertMaterial({color:0xe7dfcf});
+      const dark = new THREE.MeshLambertMaterial({color:0x263746});
+      const glass = new THREE.MeshLambertMaterial({color:0x8bc4dc, emissive:0x152b3b});
+      const balcony = new THREE.MeshLambertMaterial({color:0x343b42});
+      // Rooftop parapet / architectural cornice
+      if (type !== 'house') {
+        const cornice = new THREE.Mesh(new THREE.BoxGeometry(w+0.32,0.34,d+0.32),trim);
+        cornice.position.y=h/2+0.12; group.add(cornice);
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(w-0.55,0.12,d-0.55),new THREE.MeshLambertMaterial({color:0x777b80}));
+        roof.position.y=h/2+0.34; group.add(roof);
+        for (let side of [-1,1]) {
+          const parapet = new THREE.Mesh(new THREE.BoxGeometry(w-0.35,0.55,0.14),trim);
+          parapet.position.set(0,h/2+0.58,side*(d/2-0.14)); group.add(parapet);
+        }
+      }
+      // Balcony rails and window surrounds on street-facing facades
+      const floors = Math.max(1,Math.floor(h/3.2));
+      const columns = type==='house'?1:Math.max(2,Math.floor(w/2.4));
+      for(let f=0;f<floors;f++){
+        const y=-h/2+1.65+f*(h-2.2)/floors;
+        for(let c=0;c<columns;c++){
+          const x=-w/2+(c+0.5)*w/columns;
+          const win=new THREE.Mesh(new THREE.BoxGeometry(type==='house'?1.0:0.92,1.2,0.12),glass);
+          win.position.set(x,y,d/2+0.07);group.add(win);
+          const frame=new THREE.Mesh(new THREE.BoxGeometry(type==='house'?1.16:1.08,1.38,0.09),trim);
+          frame.position.set(x,y,d/2+0.02);group.add(frame);
+          // Re-add glass in front of the frame for a clear window inset
+          const pane=new THREE.Mesh(new THREE.BoxGeometry(type==='house'?0.84:0.78,1.04,0.13),glass);
+          pane.position.set(x,y,d/2+0.10);group.add(pane);
+          const sill=new THREE.Mesh(new THREE.BoxGeometry(type==='house'?1.28:1.18,0.12,0.24),trim);
+          sill.position.set(x,y-0.72,d/2+0.15);group.add(sill);
+          if(type!=='house' && f>0){
+            const slab=new THREE.Mesh(new THREE.BoxGeometry(1.42,0.12,0.58),trim);
+            slab.position.set(x,y-0.78,d/2+0.28);group.add(slab);
+            const rail=new THREE.Mesh(new THREE.BoxGeometry(1.35,0.42,0.08),balcony);
+            rail.position.set(x,y-0.51,d/2+0.52);group.add(rail);
+            // Jardinière de balcon et feuillage visible depuis la rue.
+            const planterMat=new THREE.MeshLambertMaterial({color:0x9a6746});
+            const planter=new THREE.Mesh(new THREE.BoxGeometry(0.88,0.22,0.28),planterMat);
+            planter.position.set(x,y-0.38,d/2+0.63);group.add(planter);
+            for(let pi=0;pi<3;pi++){
+              const leaf=new THREE.Mesh(new THREE.SphereGeometry(0.13,7,5),new THREE.MeshLambertMaterial({color:[0x2f855a,0x3f9b50,0x5b9e45][pi]}));
+              leaf.scale.set(1.0,1.35,0.8);leaf.position.set(x+(pi-1)*0.24,y-0.22,d/2+0.62);group.add(leaf);
+            }
+          }
+        }
+      }
+      // Shopfronts at ground level for apartment buildings
+      if(type!=='house'){
+        const shopGlass=new THREE.Mesh(new THREE.BoxGeometry(w*0.72,1.45,0.14),glass);
+        shopGlass.position.set(0,-h/2+0.9,d/2+0.09);group.add(shopGlass);
+        const awning=new THREE.Mesh(new THREE.BoxGeometry(w*0.76,0.2,0.8),new THREE.MeshLambertMaterial({color:type==='medium'?0x8a684b:0x5b6063}));
+        awning.position.set(0,-h/2+1.85,d/2+0.36);group.add(awning);
+      }
+      // Lames de parement bois chaud autour de la travée centrale, comme sur la référence.
+      if(type!=='house'){
+        const woodClad=new THREE.MeshStandardMaterial({color:0x8a6244,roughness:0.82});
+        const cladW=Math.min(1.45,w*0.18);
+        const cladding=new THREE.Mesh(new THREE.BoxGeometry(cladW,h*0.88,0.10),woodClad);
+        cladding.position.set(-w*0.20,0,d/2+0.055);group.add(cladding);
+        for(let fy=0;fy<Math.max(2,Math.floor(h/3.2));fy++){
+          const seam=new THREE.Mesh(new THREE.BoxGeometry(cladW,0.035,0.025),new THREE.MeshLambertMaterial({color:0x5d412e}));
+          seam.position.set(-w*0.20,-h/2+1.2+fy*(h/Math.max(2,Math.floor(h/3.2))),d/2+0.11);group.add(seam);
+        }
+      }
+      // Détails architecturaux supplémentaires sur les quatre façades : pilastres,
+      // bandeaux d'étage, fenêtres latérales, garde-corps et entrée mise en valeur.
+      if (type !== 'house') {
+        const pillarMat = new THREE.MeshLambertMaterial({color:0xd4d8dc});
+        const bandMat = new THREE.MeshLambertMaterial({color:0xf0e6d2});
+        const metalMat = new THREE.MeshStandardMaterial({color:0x303943, metalness:0.45, roughness:0.5});
+        const doorMat = new THREE.MeshStandardMaterial({color:0x765039, roughness:0.62});
+        // Vertical corner pilasters make the building silhouette less flat.
+        for (const sx of [-1,1]) for (const sz of [-1,1]) {
+          const pilaster = new THREE.Mesh(new THREE.BoxGeometry(0.22,h,0.22),pillarMat);
+          pilaster.position.set(sx*(w/2-0.14),0,sz*(d/2-0.14)); pilaster.castShadow=true; group.add(pilaster);
+        }
+        // Continuous floor bands around the whole building.
+        for(let f=1;f<floors;f++){
+          const yy=-h/2+f*h/floors;
+          const frontBand=new THREE.Mesh(new THREE.BoxGeometry(w+0.08,0.12,0.16),bandMat);
+          frontBand.position.set(0,yy,d/2+0.04); group.add(frontBand);
+          const backBand=new THREE.Mesh(new THREE.BoxGeometry(w+0.08,0.12,0.16),bandMat);
+          backBand.position.set(0,yy,-d/2-0.04); group.add(backBand);
+          for(const sx of [-1,1]){
+            const sideBand=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.12,d+0.08),bandMat);
+            sideBand.position.set(sx*(w/2+0.04),yy,0); group.add(sideBand);
+          }
+        }
+        // Side and rear windows, with visible frames and dark inset glass.
+        const sideWindowMat=new THREE.MeshStandardMaterial({color:0x526c78, emissive:0x101a20, roughness:0.24, metalness:0.12});
+        const sideColumns=Math.max(2,Math.floor(d/3.1));
+        for(const side of [-1,1]){
+          for(let f=0;f<floors;f++){
+            const yy=-h/2+1.65+f*(h-2.2)/floors;
+            for(let c=0;c<sideColumns;c++){
+              const zz=-d/2+(c+0.5)*d/sideColumns;
+              const frame=new THREE.Mesh(new THREE.BoxGeometry(0.10,1.32,1.02),bandMat);
+              frame.position.set(side*(w/2+0.035),yy,zz); group.add(frame);
+              const pane=new THREE.Mesh(new THREE.BoxGeometry(0.13,1.08,0.78),sideWindowMat);
+              pane.position.set(side*(w/2+0.09),yy,zz); group.add(pane);
+              if(f>0 && c%2===0){
+                const balconyFloor=new THREE.Mesh(new THREE.BoxGeometry(0.62,0.10,1.22),bandMat);
+                balconyFloor.position.set(side*(w/2+0.30),yy-0.72,zz); group.add(balconyFloor);
+                const rail=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.42,1.12),metalMat);
+                rail.position.set(side*(w/2+0.58),yy-0.49,zz); group.add(rail);
+                for(const rz of [-0.46,0,0.46]){
+                  const baluster=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.42,0.045),metalMat);
+                  baluster.position.set(side*(w/2+0.58),yy-0.49,zz+rz); group.add(baluster);
+                }
+              }
+            }
+          }
+        }
+        // Main entrance: framed door, canopy and two entrance lights.
+        const entranceY=-h/2+1.05;
+        const entranceDoor=new THREE.Mesh(new THREE.BoxGeometry(1.25,2.05,0.16),doorMat);
+        entranceDoor.position.set(0,entranceY,d/2+0.16); group.add(entranceDoor);
+        const entranceFrame=new THREE.Mesh(new THREE.BoxGeometry(1.55,2.28,0.10),bandMat);
+        entranceFrame.position.set(0,entranceY+0.08,d/2+0.11); group.add(entranceFrame);
+        const canopy=new THREE.Mesh(new THREE.BoxGeometry(2.25,0.16,0.9),metalMat);
+        canopy.position.set(0,entranceY+1.25,d/2+0.48); canopy.castShadow=true; group.add(canopy);
+        for(const lx of [-0.92,0.92]){
+          const lamp=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.24,0.10),new THREE.MeshLambertMaterial({color:0xffd58a,emissive:0x6b4210}));
+          lamp.position.set(lx,entranceY+1.12,d/2+0.16); group.add(lamp);
+        }
+        const stepMat=new THREE.MeshLambertMaterial({color:0xc7c6bd});
+        for(let st=0;st<3;st++){
+          const step=new THREE.Mesh(new THREE.BoxGeometry(2.15-st*0.18,0.12,0.42),stepMat);
+          step.position.set(0,-h/2+0.12+st*0.10,d/2+0.55+st*0.24);group.add(step);
+        }
+        // Decorative planted pots beside the entrance.
+        for(const px of [-1.42,1.42]){
+          const pot=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.16,0.34,8),new THREE.MeshLambertMaterial({color:0x9b6747}));
+          pot.position.set(px,entranceY-0.48,d/2+0.38);group.add(pot);
+          const plant=new THREE.Mesh(new THREE.SphereGeometry(0.34,8,6),new THREE.MeshLambertMaterial({color:0x39804a}));
+          plant.scale.y=1.15;plant.position.set(px,entranceY-0.13,d/2+0.38);group.add(plant);
+        }
+        // Rooftop equipment and small ventilation units.
+        for(const [rx,rz] of [[-w*0.28,-d*0.22],[w*0.24,d*0.20]]){
+          const unit=new THREE.Mesh(new THREE.BoxGeometry(0.8,0.38,0.65),pillarMat);
+          unit.position.set(rx,h/2+0.48,rz); group.add(unit);
+          const grille=new THREE.Mesh(new THREE.BoxGeometry(0.56,0.18,0.04),metalMat);
+          grille.position.set(rx,h/2+0.48,rz+0.34); group.add(grille);
+        }
+      }
+      mesh.add(group);
+    }
+
+    // Jardins d'une case autour des bâtiments. Les routes restent prioritaires ;
+    // un poteau électrique peut être installé sur une case de jardin.
+    function refreshBuildingGardens() {
+      while (gardensGroup.children.length) {
+        const obj = gardensGroup.children.pop();
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+          else obj.material.dispose();
+        }
+      }
+      gardenCells.clear();
+      const desired = new Set();
+      const footprints = [];
+      for (const d of buildingMap.values()) {
+        if (d.type !== 'pole') footprints.push({tx:d.tx,tz:d.tz,w:d.w||1,h:d.h||1});
+      }
+      for (const f of farmMap.values()) footprints.push({tx:f.tx,tz:f.tz,w:f.w||3,h:f.h||3});
+      for (const m of millMap.values()) footprints.push({tx:m.tx,tz:m.tz,w:m.w||4,h:m.h||4});
+      for (const f of footprints) {
+        for (let x=f.tx-1; x<=f.tx+f.w; x++) for (let z=f.tz-1; z<=f.tz+f.h; z++) {
+          if (!isInBounds(x,z) || (x>=f.tx && x<f.tx+f.w && z>=f.tz && z<f.tz+f.h)) continue;
+          if (isRoad(x,z)) continue;
+          const cell = grid[x][z];
+          const poleHere = [...buildingMap.values()].some(d => d.type==='pole' && d.tx===x && d.tz===z);
+          if (cell !== 0 && !poleHere) continue;
+          desired.add(key(x,z));
+        }
+      }
+      for (const cell of desired) gardenCells.add(cell);
+      const grass = new THREE.MeshLambertMaterial({color:0x76a95f});
+      const edge = new THREE.MeshLambertMaterial({color:0x477b3e});
+      const flowerMats = [0xf8fafc,0xf59e0b,0xec4899,0x8b5cf6].map(c=>new THREE.MeshLambertMaterial({color:c}));
+      const trunkMat = new THREE.MeshLambertMaterial({color:0x795548});
+      const leafMats = [0x2f855a,0x388e3c,0x4d9b50].map(c=>new THREE.MeshLambertMaterial({color:c}));
+      const fenceMat = new THREE.MeshLambertMaterial({color:0xe7d8b5});
+      const gateMat = new THREE.MeshLambertMaterial({color:0x704b2b});
+      const pathMat = new THREE.MeshLambertMaterial({color:0xd6c6a4});
+      const gardenLampMat = new THREE.MeshStandardMaterial({color:0x263238,metalness:0.55,roughness:0.4});
+      const gardenLightMat = new THREE.MeshStandardMaterial({color:0xffe5a3,emissive:0xffbd59,emissiveIntensity:0.35});
+      const polePositions = new Set([...buildingMap.values()].filter(d=>d.type==='pole').map(d=>key(d.tx,d.tz)));
+      for (const cell of desired) {
+        const [x,z] = cell.split(',').map(Number);
+        const cx=x*TILE+TILE/2, cz=z*TILE+TILE/2;
+        const tile = new THREE.Mesh(new THREE.BoxGeometry(TILE*0.96,0.08,TILE*0.96), grass);
+        tile.position.set(cx,0.045,cz); tile.userData = {type:'garden',tx:x,tz:z}; gardensGroup.add(tile);
+        if (polePositions.has(cell)) continue; // keep a clear installation pad for electrical poles
+        // Accès paysager côté route : chemin de pierre et portail visibles depuis la rue.
+        const roadDirs=[[0,-1],[1,0],[0,1],[-1,0]].filter(([dx,dz])=>isInBounds(x+dx,z+dz)&&isRoad(x+dx,z+dz));
+        if (roadDirs.length) {
+          const [dx,dz]=roadDirs[0];
+          if ((x+z)%3===0) {
+            const lx=cx-dx*TILE*0.28, lz=cz-dz*TILE*0.28;
+            const post=new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.075,2.15,7),gardenLampMat);
+            post.position.set(lx,1.08,lz); gardensGroup.add(post);
+            const globe=new THREE.Mesh(new THREE.SphereGeometry(0.18,8,6),gardenLightMat);
+            globe.position.set(lx,2.18,lz); gardensGroup.add(globe);
+          }
+          const path=new THREE.Mesh(new THREE.BoxGeometry(dx===0?TILE*0.34:TILE*0.9,0.055,dz===0?TILE*0.34:TILE*0.9),pathMat);
+          path.position.set(cx,0.105,cz); gardensGroup.add(path);
+          // Portail d'entrée côté route, matérialisé par deux piliers et une ouverture centrale.
+          for (const side of [-1,1]) {
+            const post=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.8,0.16),gateMat);
+            post.position.set(cx+ (dx===0?side*TILE*0.22:dx*TILE*0.43),0.45,cz+(dz===0?side*TILE*0.22:dz*TILE*0.43)); gardensGroup.add(post);
+          }
+        }
+        // Low perimeter fence sections, leaving a gate opening toward a road.
+        const fenceY=0.38, fenceH=0.62, fenceT=0.12;
+        const edges=[{dx:0,dz:-1, horizontal:true},{dx:1,dz:0,horizontal:false},{dx:0,dz:1,horizontal:true},{dx:-1,dz:0,horizontal:false}];
+        for (const e of edges) {
+          const nx=x+e.dx,nz=z+e.dz;
+          if (!isInBounds(nx,nz) || desired.has(key(nx,nz)) || isRoad(nx,nz)) continue;
+          if (roadDirs.length && e.dx===roadDirs[0][0] && e.dz===roadDirs[0][1]) continue;
+          const fence=new THREE.Mesh(new THREE.BoxGeometry(e.horizontal?TILE*0.92:fenceT,fenceH,e.horizontal?fenceT:TILE*0.92),fenceMat);
+          fence.position.set(cx+e.dx*TILE*0.46,fenceY,cz+e.dz*TILE*0.46); gardensGroup.add(fence);
+          for (const t of [-0.38,0,0.38]) {
+            const post=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.78,0.16),gateMat);
+            post.position.set(cx+(e.horizontal?t*TILE:e.dx*TILE*0.46),0.45,cz+(e.horizontal?e.dz*TILE*0.46:t*TILE)); gardensGroup.add(post);
+          }
+        }
+        // Flowers and shrubs vary deterministically by tile coordinate.
+        if ((x*7+z*3)%4!==0) {
+          for (let i=0;i<5;i++) {
+            const fx=cx+(((x+i*3)%5)-2)*0.48, fz=cz+(((z+i*2)%5)-2)*0.42;
+            const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.045,0.34,5),edge); stem.position.set(fx,0.25,fz); gardensGroup.add(stem);
+            const bloom=new THREE.Mesh(new THREE.SphereGeometry(0.13,6,5),flowerMats[(x+z+i)%flowerMats.length]); bloom.position.set(fx,0.45,fz); gardensGroup.add(bloom);
+          }
+        }
+        if ((x+z)%3===0) {
+          const tx=cx+((x%3)-1)*0.9, tz=cz+((z%3)-1)*0.9;
+          // Arbre paysager : tronc épais, branches visibles et feuillage irrégulier.
+          const treeHeight = 5.0 + ((Math.abs(x*3+z*5)%3)*0.55);
+          const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.20,0.31,treeHeight*0.62,9),trunkMat);
+          trunk.position.set(tx,treeHeight*0.31,tz); trunk.castShadow=true; gardensGroup.add(trunk);
+          for (let bi=0; bi<3; bi++) {
+            const branch=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.13,treeHeight*0.28,7),trunkMat);
+            const a=[-0.72,0.08,0.78][bi];
+            branch.position.set(tx+a*0.55,treeHeight*(0.53+bi*0.055),tz+(bi-1)*0.18);
+            branch.rotation.z=a*0.62; branch.rotation.x=(bi-1)*0.18;
+            branch.castShadow=true; gardensGroup.add(branch);
+          }
+          const crownY=treeHeight*0.76;
+          const crownOffsets=[
+            [0,0,0,1.12,1.22,1.00],[-0.70,-0.16,0.12,0.76,0.86,0.78],
+            [0.66,-0.10,-0.18,0.82,0.94,0.78],[-0.28,0.34,-0.52,0.72,0.82,0.74],
+            [0.34,0.29,0.46,0.78,0.88,0.80],[0.02,0.62,0.02,0.66,0.72,0.68]
+          ];
+          crownOffsets.forEach((o,ci)=>{
+            const crown=new THREE.Mesh(new THREE.SphereGeometry(1,10,8),leafMats[(x+z+ci)%leafMats.length]);
+            crown.scale.set(o[3],o[4],o[5]);
+            crown.position.set(tx+o[0],crownY+o[1],tz+o[2]);
+            crown.castShadow=true; crown.receiveShadow=true; gardensGroup.add(crown);
+          });
+        } else {
+          const shrub=new THREE.Mesh(new THREE.SphereGeometry(0.38,8,6),edge);
+          shrub.position.set(cx+0.82,0.38,cz-0.62); shrub.scale.set(1.2,0.85,0.9); gardensGroup.add(shrub);
+          if ((x*3+z)%2===0) {
+            const bloomMats=[0xec4899,0xf472b6,0xf8fafc,0xf59e0b].map(c=>new THREE.MeshLambertMaterial({color:c}));
+            for(let fi=0;fi<5;fi++){
+              const fx=cx+0.35+(fi%3)*0.22, fz=cz-0.35+Math.floor(fi/3)*0.22;
+              const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.035,0.28,5),trunkMat);
+              stem.position.set(fx,0.20,fz); gardensGroup.add(stem);
+              const bloom=new THREE.Mesh(new THREE.SphereGeometry(0.10,7,5),bloomMats[(fi+x+z)%bloomMats.length]);
+              bloom.position.set(fx,0.38,fz); gardensGroup.add(bloom);
+            }
+          }
+        }
+      }
+    }
+
+    function placeBuilding(tx, tz, type) {
+      const b = BUILDINGS[type];
+      if (!b || !isInBounds(tx, tz, b.w, b.h) || (type !== 'pole' && (!isAreaFree(tx, tz, b.w, b.h) || !hasRoadFrontage(tx, tz, b.w, b.h) || Array.from({length:b.w},(_,dx)=>Array.from({length:b.h},(_,dz)=>gardenCells.has(key(tx+dx,tz+dz)))).flat().some(Boolean))) || (type === 'pole' && (grid[tx][tz] === 1 || grid[tx][tz] === 2 || grid[tx][tz] === 4))) return;
+      // Poteaux posables sur toute case libre hors routes et emprises bâties ; espacement minimal de 3 cases.
+      if (type === 'pole') {
+        const tooClose = [...buildingMap.values()].some(p => p.type === 'pole' &&
+          Math.abs(p.tx - tx) + Math.abs(p.tz - tz) < 3);
+        if (tooClose) {
+          const status = document.getElementById('status');
+          if (status) { status.textContent = 'Poteau refusé : laissez au moins 3 cases entre les poteaux.'; status.style.color = '#fbbf24'; }
+          return;
+        }
+      }
+      if (type !== 'pole') {
+        for (let dx = 0; dx < b.w; dx++) for (let dz = 0; dz < b.h; dz++) grid[tx + dx][tz + dz] = 2;
+      }
+      let mesh;
+      if (type === 'pole') {
+        mesh = new THREE.Group();
+        mesh.position.set(tx * TILE + TILE / 2, 0, tz * TILE + TILE / 2);
+        const steel = new THREE.MeshLambertMaterial({ color: 0x64748b });
+        const insulator = new THREE.MeshLambertMaterial({ color: 0xdbeafe });
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 7.5, 8), steel);
+        mast.position.y = 3.75; mesh.add(mast);
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.18, 0.22), steel);
+        arm.position.y = 6.5; mesh.add(arm);
+        for (const x of [-1.25,0,1.25]) {
+          const ins = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.45,8), insulator);
+          ins.position.set(x,6.82,0); mesh.add(ins);
+        }
+        mesh.userData = { type, tx, tz, w:1, h:1, pax:0 };
+        buildingsGroup.add(mesh);
+      } else if (type === 'wind') {
+        // Small wind turbine on a 2x2 plot, not a large solid building.
+        mesh = new THREE.Group();
+        mesh.position.set(tx * TILE + b.w * TILE / 2, 0, tz * TILE + b.h * TILE / 2);
+        const mastMat = new THREE.MeshLambertMaterial({ color: 0xe5e7eb });
+        const hubMat = new THREE.MeshLambertMaterial({ color: 0xf8fafc });
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.42, 13, 10), mastMat);
+        mast.position.y = 6.5; mesh.add(mast);
+        const hub = new THREE.Mesh(new THREE.SphereGeometry(0.62, 10, 8), hubMat);
+        hub.position.set(0, 12.8, 0); mesh.add(hub);
+        const bladeMat = new THREE.MeshLambertMaterial({ color: 0xf8fafc });
+        const rotor = new THREE.Group(); rotor.position.set(0, 12.8, 0.35); mesh.add(rotor);
+        for (let i=0;i<3;i++) {
+          const blade = new THREE.Mesh(new THREE.BoxGeometry(0.34, 4.9, 0.14), bladeMat);
+          blade.position.y = 2.8; blade.rotation.z = i * Math.PI * 2 / 3; rotor.add(blade);
+        }
+        mesh.userData = { type, tx, tz, w: b.w, h: b.h, pax: b.pax, rotor };
+        buildingsGroup.add(mesh);
+      } else {
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(b.w * TILE * 0.88, b.height, b.h * TILE * 0.88), new THREE.MeshLambertMaterial({ color: b.color }));
+        mesh.position.set(tx * TILE + b.w * TILE / 2, b.height / 2, tz * TILE + b.h * TILE / 2);
+        mesh.userData = { type, tx, tz, w: b.w, h: b.h, pax: b.pax };
+        buildingsGroup.add(mesh); addBuildingDetails(mesh, b); addHousingFacadeDetails(mesh, b, type);
+      }
+      buildingMap.set(key(tx, tz), { mesh, type, pax: b.pax, tx, tz, w: b.w, h: b.h });
+      const numCars = Math.floor(b.pax / 4);
+      totalPop += b.pax; totalCars += numCars; totalBuildings++;
+      if (b.jobs) totalJobs += b.jobs;
+      if (type === 'powerplant') addPowerPlantDetails(mesh, b);
+      refreshBuildingGardens();
+      refreshPowerNetwork();
+      updateStats();
+      const nearby = [];
+      for (let dx = -4; dx < b.w + 4; dx++) for (let dz = -4; dz < b.h + 4; dz++)
+        if (isRoad(tx + dx, tz + dz)) nearby.push({ x: tx + dx, z: tz + dz });
+      for (let i = 0; i < numCars && nearby.length; i++) {
+        const r = nearby[Math.floor(Math.random() * nearby.length)];
+        spawnCar(r.x, r.z);
+      }
+      spawnPeople(tx, tz, b.w, b.h, Math.min(Math.floor(b.pax / 4), 5));
+    }
+
+    // ===== MINOTERIE =====
+    function placeMill(tx, tz) {
+      const w = 4, h = 4;
+      if (!isInBounds(tx, tz, w, h) || !isAreaFree(tx, tz, w, h) || !hasRoadFrontage(tx, tz, w, h) || Array.from({length:w},(_,dx)=>Array.from({length:h},(_,dz)=>gardenCells.has(key(tx+dx,tz+dz)))).flat().some(Boolean)) return;
+      for (let dx = 0; dx < w; dx++) for (let dz = 0; dz < h; dz++) grid[tx + dx][tz + dz] = 4;
+      const g = new THREE.Group();
+      const wall = new THREE.MeshLambertMaterial({color:0xd6c3a1});
+      const roof = new THREE.MeshLambertMaterial({color:0x9d4933});
+      const metal = new THREE.MeshLambertMaterial({color:0x9ca3af});
+      const dark = new THREE.MeshLambertMaterial({color:0x374151});
+      const cx = w*TILE/2, cz = h*TILE/2;
+      function box(x,y,z,sx,sy,sz,mat){const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),mat);m.position.set(x,y,z);g.add(m);return m;}
+      // Main processing hall, attached office, loading bay and roof
+      box(cx,3.4,cz,w*TILE*0.76,6.8,h*TILE*0.58,wall);
+      box(cx-7,2.5,cz+8,9,5,10,wall);
+      box(cx,7.1,cz,w*TILE*0.78,0.35,h*TILE*0.60,roof);
+      box(cx-7,5.1,cz+8,9.2,0.3,10.2,roof);
+      // Silos and grain pipes
+      for (const [x,z,r,hgt] of [[cx+8,cz-6,2.5,8],[cx+14,cz-5,2.5,9]]) {
+        const silo=new THREE.Mesh(new THREE.CylinderGeometry(r,r,hgt,16),metal); silo.position.set(x,hgt/2+0.4,z);g.add(silo);
+        const cap=new THREE.Mesh(new THREE.ConeGeometry(r,1.3,16),metal);cap.position.set(x,hgt+1,z);g.add(cap);
+      }
+      box(cx+10,5.2,cz+1,1,0.35,14,metal); // conveyor
+      box(cx+3,1.8,cz+h*TILE*0.31,7,3.6,0.25,dark); // loading opening
+      box(cx-7,2.5,cz+h*TILE*0.31+0.16,1.8,2.5,0.16,new THREE.MeshLambertMaterial({color:0x60a5fa}));
+      // Signboard
+      box(cx,5.4,cz+h*TILE*0.30+0.18,8,1.15,0.2,dark);
+      // grain sacks near entrance
+      const sackMat=new THREE.MeshLambertMaterial({color:0xd8b477});
+      for(let i=0;i<4;i++){const sack=new THREE.Mesh(new THREE.SphereGeometry(0.65,8,6),sackMat);sack.scale.set(1,0.8,0.7);sack.position.set(cx-5+i*1.25,0.65,cz+h*TILE*0.31+2);g.add(sack);}
+      g.position.set(tx*TILE,0,tz*TILE); buildingsGroup.add(g);
+      const mill={type:'mill',tx,tz,w,h,group:g,dailyInput:200,wheatStock:0,lastInput:0,lastOutput:0,jobs:5};
+      millMap.set(key(tx,tz),mill); totalJobs+=mill.jobs; totalBuildings++; refreshBuildingGardens(); refreshPowerNetwork(); updateStats();
+    }
+
+    // ===== FARMS (wheat / rice) =====
+    function createTruckMesh() {
+      // Detailed agricultural lorry with cab, windshield, mirrors, chassis,
+      // six wheels, side panels and a visible grain load in the open bed.
+      const g = new THREE.Group();
+      const mat=(c,r=0.7,m=0.08)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m});
+      const cabMat=mat(0xe7edf2,0.34,0.18), trim=mat(0x25313a,0.55,0.18), glass=mat(0x77c9ef,0.22,0.12);
+      const tire=mat(0x17191d,0.95,0), steel=mat(0x9ca8b3,0.42,0.65), grain=mat(0xc99b3c,0.95,0), grainLight=mat(0xe3bb62,0.92,0);
+      const box=(w,h,d,material,x,y,z)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;g.add(o);return o;};
+      // Frame and cab (truck faces -Z).
+      box(1.72,0.32,4.55,trim,0,0.47,0.05);
+      box(1.8,1.28,1.55,cabMat,0,1.05,-1.48);
+      box(1.56,0.12,1.42,cabMat,0,1.76,-1.48);
+      box(1.42,0.67,0.08,glass,0,1.29,-2.275);
+      box(0.07,0.58,0.78,glass,0.91,1.3,-1.53);
+      box(0.07,0.58,0.78,glass,-0.91,1.3,-1.53);
+      // Front bumper, grille, lights and mirrors.
+      box(1.76,0.2,0.18,trim,0,0.47,-2.34);
+      box(0.64,0.34,0.05,trim,0,0.85,-2.31);
+      for(const x of [-0.63,0.63]) box(0.25,0.2,0.06,mat(0xfff1c2,0.25,0.05),x,0.79,-2.33);
+      for(const x of [-1.0,1.0]) { box(0.16,0.12,0.22,trim,x,1.22,-1.82); box(0.12,0.08,0.1,glass,x*1.04,1.24,-1.84); }
+      // Open cargo bed with visible grain pile.
+      const bedZ=0.92;
+      box(1.82,0.16,2.65,trim,0,0.82,bedZ);
+      box(0.12,0.8,2.65,steel,-0.88,1.19,bedZ);
+      box(0.12,0.8,2.65,steel,0.88,1.19,bedZ);
+      box(1.82,0.8,0.12,steel,0,1.19,2.24);
+      // Grain heap as overlapping low-poly mounds, contained within the bed.
+      const mound=new THREE.Mesh(new THREE.SphereGeometry(1,10,7),grain); mound.scale.set(0.78,0.38,1.08); mound.position.set(0,1.43,0.82); mound.castShadow=true; g.add(mound);
+      for(let i=0;i<9;i++){
+        const seed=new THREE.Mesh(new THREE.SphereGeometry(0.12,6,5),i%3===0?grainLight:grain);
+        seed.position.set(-0.62+(i%3)*0.62,1.55+((i*7)%4)*0.035,0.15+Math.floor(i/3)*0.55); seed.scale.set(1.2,0.6,1); g.add(seed);
+      }
+      // Three axles per side with visible hubs.
+      for(const z of [-1.25,0.65,1.65]) for(const x of [-0.94,0.94]){
+        const w=new THREE.Mesh(new THREE.CylinderGeometry(0.34,0.34,0.24,12),tire); w.rotation.z=Math.PI/2; w.position.set(x,0.38,z); w.castShadow=true; g.add(w);
+        const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.17,0.17,0.255,10),steel); hub.rotation.z=Math.PI/2; hub.position.set(x+(x>0?0.02:-0.02),0.38,z); g.add(hub);
+      }
+      // Rear red lamps and simple side safety stripes.
+      for(const x of [-0.66,0.66]) box(0.18,0.2,0.06,mat(0xe11d48,0.3,0.02),x,0.86,2.32);
+      box(1.6,0.09,0.035,mat(0xfacc15,0.45,0.02),0,0.92,2.31);
+      return g;
+    }
+    function spawnTruck(startX, startZ, farmKey) {
+      const neighbors = getNeighbors(startX, startZ);
+      if (!neighbors.length) return null;
+      const dir = neighbors[Math.floor(Math.random() * neighbors.length)];
+      const mesh = createTruckMesh();
+      carsGroup.add(mesh);
+      const offset = getRightOffset(dir,startX,startZ);
+      mesh.position.set(startX * TILE + TILE / 2 + offset.ox, 0, startZ * TILE + TILE / 2 + offset.oz);
+      mesh.rotation.y = DIRS[dir].yaw;
+      const truck = {
+        mesh, x: startX, z: startZ, dir,
+        progress: Math.random() * 0.4,
+        speed: (0.009 + Math.random() * 0.004) * 2,
+        baseSpeed: (0.009 + Math.random() * 0.004) * 2,
+        farmKey,
+        loading: false,
+        loadTimer: 0 // game hours remaining
+      };
+      trucks.push(truck);
+      return truck;
+    }
+    function updateFarmVisual(farm) {
+      const day = Math.min(3, farm.growthDay);
+      const h = PLANT_HEIGHT[day];
+      const cols = farm.type === 'wheat' ? PLANT_COLORS_WHEAT : PLANT_COLORS_RICE;
+      const col = cols[day];
+      for (const plant of farm.plants) {
+        plant.scale.y = h / 0.3;
+        plant.position.y = 0;
+        plant.traverse(obj => {
+          if (!obj.isMesh || !obj.material) return;
+          if (obj.userData.cropPart === 'stem' || obj.userData.cropPart === 'leaf') obj.material.color.setHex(col);
+          if (obj.userData.cropPart === 'grain') {
+            const grainColor = farm.type === 'wheat'
+              ? [0x9bd66b, 0xb7bd36, 0xd9a21b, 0xf2c232][day]
+              : [0x8bd59b, 0x58c879, 0x36ad5d, 0x24964b][day];
+            obj.material.color.setHex(grainColor);
+          }
+        });
+      }
+    }
+    function placeFarm(tx, tz, type) {
+      const f = FARMS[type];
+      if (!f || !isInBounds(tx, tz, f.w, f.h) || !isAreaFree(tx, tz, f.w, f.h) || !hasRoadFrontage(tx, tz, f.w, f.h) || Array.from({length:f.w},(_,dx)=>Array.from({length:f.h},(_,dz)=>gardenCells.has(key(tx+dx,tz+dz)))).flat().some(Boolean)) return;
+      for (let dx = 0; dx < f.w; dx++) for (let dz = 0; dz < f.h; dz++) grid[tx + dx][tz + dz] = 3; // 3 = farm
+
+      const group = new THREE.Group();
+      // Crop area: six cultivated tiles arranged like a small isometric farm.
+      // Visible furrows and orderly, denser rows create a fuller field appearance.
+      const plants = [];
+      const stemMat = new THREE.MeshLambertMaterial({ color: type === 'wheat' ? 0x86efac : 0xbbf7d0 });
+      const leafMat = new THREE.MeshLambertMaterial({ color: type === 'wheat' ? 0xa3e635 : 0x4ade80 });
+      const grainMat = new THREE.MeshLambertMaterial({ color: type === 'wheat' ? 0x9bd66b : 0x8bd59b });
+      const stemGeo = new THREE.CylinderGeometry(0.055, 0.075, 0.3, 5);
+      const leafGeo = new THREE.BoxGeometry(0.40, 0.065, 0.09);
+      const furrowMat = new THREE.MeshLambertMaterial({ color: type === 'wheat' ? 0x5b3c2b : 0x354e30 });
+      const bedMat = new THREE.MeshLambertMaterial({ color: type === 'wheat' ? 0x98704a : 0x65834a });
+      const grainGeo = type === 'wheat'
+        ? new THREE.ConeGeometry(0.105, 0.38, 6)
+        : new THREE.SphereGeometry(0.105, 7, 5);
+      for (let dx = 0; dx < f.cropW; dx++) {
+        for (let dz = 0; dz < f.cropH; dz++) {
+          const soil = new THREE.Mesh(
+            new THREE.BoxGeometry(TILE * 0.96, 0.18, TILE * 0.96),
+            new THREE.MeshLambertMaterial({ color: type === 'wheat' ? 0x76513b : 0x4d6b42 })
+          );
+          soil.position.set((dx + 0.5) * TILE, 0.09, (dz + 0.5) * TILE);
+          group.add(soil);
+          // Eight parallel raised beds per tile, with dark furrows between them.
+          for (let row = 0; row < 8; row++) {
+            const furrow = new THREE.Mesh(new THREE.BoxGeometry(TILE * 0.88, 0.035, 0.10), furrowMat);
+            furrow.position.set((dx + 0.5) * TILE, 0.205, (dz + 0.08 + row * 0.12) * TILE);
+            group.add(furrow);
+          }
+          for (let k = 0; k < 20; k++) {
+            const plant = new THREE.Group();
+            // Aligned rows with small offsets to avoid a rigid, artificial grid.
+            const colIndex = k % 5;
+            const rowIndex = Math.floor(k / 5);
+            const px = (dx + 0.10 + colIndex * 0.19 + (rowIndex % 2) * 0.035) * TILE;
+            const pz = (dz + 0.12 + rowIndex * 0.18) * TILE;
+            const stem = new THREE.Mesh(stemGeo, stemMat.clone());
+            stem.position.y = 0.15; stem.userData.cropPart = 'stem'; plant.add(stem);
+            for (let leafIndex = 0; leafIndex < 2; leafIndex++) {
+              const leaf = new THREE.Mesh(leafGeo, leafMat.clone());
+              leaf.position.set(leafIndex === 0 ? 0.10 : -0.09, 0.12 + leafIndex * 0.055, leafIndex === 0 ? 0.035 : -0.035);
+              leaf.rotation.z = leafIndex === 0 ? -0.38 : 0.38;
+              leaf.rotation.y = leafIndex === 0 ? 0.35 : -0.35;
+              leaf.userData.cropPart = 'leaf'; plant.add(leaf);
+            }
+            const grain = new THREE.Mesh(grainGeo, grainMat.clone());
+            grain.position.set(0, type === 'wheat' ? 0.43 : 0.39, 0);
+            if (type === 'rice') grain.scale.set(0.8, 1.25, 0.8);
+            grain.userData.cropPart = 'grain'; plant.add(grain);
+            plant.position.set(px, 0, pz);
+            plant.rotation.y = (k % 3) * 0.6;
+            group.add(plant); plants.push(plant);
+          }
+        }
+      }
+      // Farm work building: cream plaster walls, red-tile pitched roof, door and windows.
+      // Keep structures separate from the crop rows so the facade can face the nearest road.
+      const structures = new THREE.Group();
+      const bx = f.w * TILE / 2, bz = (f.cropH + 0.5) * TILE;
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0xd8c5a3, roughness: 0.92 });
+      const trimMat = new THREE.MeshStandardMaterial({ color: 0xf1e4c9, roughness: 0.82 });
+      const tileRoofMat = new THREE.MeshStandardMaterial({ color: 0x9f4a2e, roughness: 0.88 });
+      const darkMat = new THREE.MeshStandardMaterial({ color: 0x382c25, roughness: 0.9 });
+      const glassMat = new THREE.MeshStandardMaterial({ color: 0x4b8795, roughness: 0.25, metalness: 0.1 });
+      const bldg = new THREE.Mesh(new THREE.BoxGeometry(f.w * TILE * 0.94, 4.2, TILE * 0.82), wallMat);
+      bldg.position.set(bx, 2.1, bz); bldg.castShadow = true; bldg.receiveShadow = true; structures.add(bldg);
+      // Two sloping roof planes create a visible gable instead of a flat slab.
+      const roofWidth = f.w * TILE * 0.98, roofDepth = TILE * 0.43;
+      const roofA = new THREE.Mesh(new THREE.BoxGeometry(roofWidth, 0.28, roofDepth), tileRoofMat);
+      roofA.position.set(bx, 4.45, bz - roofDepth * 0.30); roofA.rotation.x = -0.34; roofA.castShadow = true; structures.add(roofA);
+      const roofB = new THREE.Mesh(new THREE.BoxGeometry(roofWidth, 0.28, roofDepth), tileRoofMat);
+      roofB.position.set(bx, 4.45, bz + roofDepth * 0.30); roofB.rotation.x = 0.34; roofB.castShadow = true; structures.add(roofB);
+      // Loading doors, smaller personnel door, and blue-green windows.
+      const door = new THREE.Mesh(new THREE.BoxGeometry(1.35, 2.55, 0.12), darkMat);
+      door.position.set(bx, 1.28, bz - TILE * 0.41 - 0.07); structures.add(door);
+      const lintel = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.18, 0.2), trimMat);
+      lintel.position.set(bx, 2.63, bz - TILE * 0.41 - 0.08); structures.add(lintel);
+      for (const wx of [bx - 5.2, bx + 5.2]) {
+        const win = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.0, 0.12), glassMat);
+        win.position.set(wx, 2.55, bz - TILE * 0.41 - 0.08); structures.add(win);
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(1.36, 1.2, 0.08), trimMat);
+        frame.position.set(wx, 2.55, bz - TILE * 0.46 - 0.12); structures.add(frame);
+        win.position.z -= 0.08;
+      }
+      // Grain silo and a small open-sided equipment shelter, all kept within the farm footprint.
+      const siloX = f.w * TILE * 0.82, siloZ = bz;
+      const siloMat = new THREE.MeshStandardMaterial({ color: 0x9ca8ad, metalness: 0.62, roughness: 0.4 });
+      const silo = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 4.4, 16), siloMat);
+      silo.position.set(siloX, 2.25, siloZ); silo.castShadow = true; structures.add(silo);
+      const siloTop = new THREE.Mesh(new THREE.ConeGeometry(1.08, 0.85, 16), siloMat);
+      siloTop.position.set(siloX, 4.85, siloZ); siloTop.castShadow = true; structures.add(siloTop);
+      const shedX = f.w * TILE * 0.18, shedZ = bz + 1.7;
+      const postMat = new THREE.MeshStandardMaterial({ color: 0x6c4b32, roughness: 0.85 });
+      for (const px of [shedX - 1.8, shedX + 1.8]) for (const pz of [shedZ - 1.4, shedZ + 1.4]) {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.7, 0.16), postMat);
+        post.position.set(px, 1.35, pz); structures.add(post);
+      }
+      const shedRoof = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.22, 3.4), new THREE.MeshStandardMaterial({ color: 0x65766c, roughness: 0.8 }));
+      shedRoof.position.set(shedX, 2.8, shedZ); shedRoof.castShadow = true; structures.add(shedRoof);
+      // Small sacks/crates beside the loading entrance.
+      const crateMat = new THREE.MeshStandardMaterial({ color: 0xb18a55, roughness: 0.95 });
+      for (let i = 0; i < 3; i++) {
+        const crate = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.62, 0.62), crateMat);
+        crate.position.set(bx + 2.0 + (i % 2) * 0.78, 0.38, bz - 2.15 + Math.floor(i / 2) * 0.72); structures.add(crate);
+      }
+
+
+      // Shift the structure geometry around its own pivot, then orient its entrance toward the nearest road edge.
+      for (const part of structures.children) {
+        part.position.x -= bx;
+        part.position.z -= bz;
+      }
+      let roadDistances = [
+        { side: 'north', distance: 0, yaw: 0 },
+        { side: 'east', distance: 0, yaw: -Math.PI / 2 },
+        { side: 'south', distance: 0, yaw: Math.PI },
+        { side: 'west', distance: 0, yaw: Math.PI / 2 }
+      ];
+      roadDistances[0].distance = Math.min(...Array.from({length:f.w}, (_,i)=>isRoad(tx+i,tz-1)?0:999));
+      roadDistances[2].distance = Math.min(...Array.from({length:f.w}, (_,i)=>isRoad(tx+i,tz+f.h)?0:999));
+      roadDistances[3].distance = Math.min(...Array.from({length:f.h}, (_,i)=>isRoad(tx-1,tz+i)?0:999));
+      roadDistances[1].distance = Math.min(...Array.from({length:f.h}, (_,i)=>isRoad(tx+f.w,tz+i)?0:999));
+      const roadSide = roadDistances.find(r => r.distance === Math.min(...roadDistances.map(q=>q.distance)));
+      structures.position.set(bx, 0, bz);
+      structures.rotation.y = roadSide && roadSide.distance < 999 ? roadSide.yaw : 0;
+      group.add(structures);
+      group.position.set(tx * TILE, 0, tz * TILE);
+      buildingsGroup.add(group);
+
+      const farm = {
+        type, tx, tz, w: f.w, h: f.h,
+        growthDay: 0,
+        group, plants,
+        food: f.food, jobs: f.jobs
+      };
+      farmMap.set(key(tx, tz), farm);
+      refreshBuildingGardens();
+      updateFarmVisual(farm);
+      totalJobs += f.jobs;
+      totalBuildings++;
+      updateStats();
+
+      // Spawn truck on nearby road
+      const nearby = [];
+      for (let dx = -2; dx < f.w + 2; dx++)
+        for (let dz = -2; dz < f.h + 2; dz++)
+          if (isRoad(tx + dx, tz + dz)) nearby.push({ x: tx + dx, z: tz + dz });
+      if (nearby.length) {
+        const r = nearby[Math.floor(Math.random() * nearby.length)];
+        spawnTruck(r.x, r.z, key(tx, tz));
+      }
+    }
+    function advanceDay() {
+      gameDay++;
+      // Répartition simple de l'électricité : les activités productives ralentissent en cas de pénurie.
+      const powerState = calculatePower();
+      const powerRatio = powerState.demand > 0 ? Math.min(1, powerState.produced / powerState.demand) : 1;
+      // En cas de pénurie, les activités productives sont ralenties ; le réseau physique détaillé reste à finaliser.
+      // 1) Les champs arrivent à maturité et stockent leur récolte.
+      for (const [, farm] of farmMap) {
+        farm.growthDay++;
+        if (farm.growthDay >= 3) {
+          const harvested = Math.floor(farm.food * (0.35 + 0.65 * powerRatio));
+          if (farm.type === 'wheat') wheatStock += harvested;
+          else foodStock += harvested;
+          farm.growthDay = 0;
+          for (const t of trucks) {
+            if (t.farmKey === key(farm.tx, farm.tz)) {
+              t.loading = true;
+              t.loadTimer = 1;
+            }
+          }
+        }
+        updateFarmVisual(farm);
+      }
+      // 2) Transport agricole : chaque camion peut livrer au maximum 20 kg/jour.
+      // Le blé est livré à la minoterie la plus proche disposant d'un accès routier.
+      const mills = [...millMap.values()];
+      if (mills.length && wheatStock > 0) {
+        const wheatTrucks = trucks.filter(t => farmMap.get(t.farmKey)?.type === 'wheat');
+        for (const truck of wheatTrucks) {
+          if (wheatStock <= 0) break;
+          const farm = farmMap.get(truck.farmKey);
+          if (!farm) continue;
+          let bestMill = null, bestDistance = Infinity;
+          for (const mill of mills) {
+            const d = Math.abs(mill.tx - farm.tx) + Math.abs(mill.tz - farm.tz);
+            if (d < bestDistance) { bestDistance = d; bestMill = mill; }
+          }
+          if (!bestMill) continue;
+          const load = Math.min(20, wheatStock);
+          bestMill.wheatStock += load;
+          wheatStock -= load;
+        }
+      }
+      // 3) Chaque minoterie transforme uniquement le blé qui lui a été livré.
+      for (const mill of mills) {
+        const input = Math.min(Math.floor(mill.dailyInput * (0.25 + 0.75 * powerRatio)), mill.wheatStock);
+        mill.lastInput = input;
+        mill.lastOutput = input / 2;
+        mill.wheatStock -= input;
+        flourStock += mill.lastOutput;
+      }
+      // 4) Bilan électrique journalier (l’électricité manquante est signalée dans le tableau de bord).
+      calculatePower();
+      // 5) Consommation alimentaire quotidienne.
+      foodStock -= totalPop * 2;
+      if (foodStock < 0) foodStock = 0;
+      updateStats();
+      // Rafraîchir les données du panneau ouvert : les valeurs ne restent plus figées.
+      if (activeInfoTile && infoPanel.classList.contains('visible')) {
+        const hit = findBuildingAt(activeInfoTile.x, activeInfoTile.z);
+        if (hit?.kind === 'mill') {
+          const m = hit.mill;
+          const fieldEl = document.getElementById('mill-field-stock');
+          const stockEl = document.getElementById('mill-wheat-stock');
+          const flourEl = document.getElementById('mill-flour-stock');
+          const actualEl = document.getElementById('mill-actual-input');
+          const outputEl = document.getElementById('mill-output-value');
+          if (fieldEl) fieldEl.textContent = `${Math.floor(wheatStock)} kg`;
+          if (stockEl) stockEl.textContent = `${Math.floor(m.wheatStock)} kg`;
+          if (flourEl) flourEl.textContent = `${Math.floor(flourStock)} kg`;
+          if (actualEl) actualEl.textContent = `${Math.floor(m.lastInput)} kg`;
+          if (outputEl) outputEl.textContent = Math.floor(m.lastOutput);
+        } else if (hit?.kind === 'farm') {
+          showInfoAt(activeInfoTile.x, activeInfoTile.z);
+        }
+      }
+    }
+    function updateTrucks() {
+      for (const truck of trucks) {
+        // Loading at harvest: stop 1 game hour
+        if (truck.loading) {
+          // Convert: gameHour advances ~0.00055 per frame → 1 hour ≈ 1/0.00055 ≈ 1818 frames
+          // Better: track via gameHour delta — simple: decrement using same rate as clock
+          truck.loadTimer -= 0.00055;
+          truck.speed = 0;
+          if (truck.loadTimer <= 0) {
+            truck.loading = false;
+            truck.loadTimer = 0;
+            truck.speed = truck.baseSpeed;
+          }
+          // Park near farm entrance
+          const farm = farmMap.get(truck.farmKey);
+          if (farm) {
+            const fx = farm.tx * TILE + farm.w * TILE / 2;
+            const fz = farm.tz * TILE + farm.h * TILE + 1;
+            truck.mesh.position.x += (fx - truck.mesh.position.x) * 0.05;
+            truck.mesh.position.z += (fz - truck.mesh.position.z) * 0.05;
+          }
+          continue;
+        }
+
+        const nextX = truck.x + DIRS[truck.dir].dx, nextZ = truck.z + DIRS[truck.dir].dz;
+        let mustStop = false;
+        if (shouldStopForLight({ x: truck.x, z: truck.z, dir: truck.dir, progress: truck.progress })) mustStop = true;
+        // Shared traffic safety: trucks queue behind cars and other trucks; no overtaking.
+        if (isBlockedByVehicle(truck, 'truck')) mustStop = true;
+        if (!isRoad(nextX, nextZ)) {
+          const alternatives = getNeighbors(truck.x, truck.z).filter(d => d !== (truck.dir + 2) % 4);
+          if (!alternatives.length) mustStop = true;
+        }
+        if (mustStop) truck.speed = Math.max(0, truck.speed - 0.006);
+        else truck.speed = Math.min(truck.baseSpeed * roadSpeedFactor(truck.x,truck.z), truck.speed + 0.0028);
+        if (truck.speed <= 0.0005) continue;
+        truck.progress += truck.speed;
+        if (truck.progress >= 1) {
+          if (isRoad(nextX, nextZ)) {
+            truck.x = nextX; truck.z = nextZ; truck.progress = 0;
+            truck.dir = chooseNextDir(truck.x, truck.z, truck.dir);
+          } else {
+            const alternatives = getNeighbors(truck.x, truck.z).filter(d => d !== (truck.dir + 2) % 4);
+            if (alternatives.length) {
+              truck.dir = chooseNextDir(truck.x, truck.z, truck.dir);
+              truck.progress = 0;
+            } else {
+              truck.progress = 0.94;
+              truck.speed = 0;
+            }
+          }
+        }
+        const d = DIRS[truck.dir], offset = getRightOffset(truck.dir,truck.x,truck.z);
+        const fromX = truck.x * TILE + TILE / 2 + offset.ox;
+        const fromZ = truck.z * TILE + TILE / 2 + offset.oz;
+        const toX = (truck.x + d.dx) * TILE + TILE / 2 + offset.ox;
+        const toZ = (truck.z + d.dz) * TILE + TILE / 2 + offset.oz;
+        truck.mesh.position.x = fromX + (toX - fromX) * truck.progress;
+        truck.mesh.position.z = fromZ + (toZ - fromZ) * truck.progress;
+        truck.mesh.rotation.y = DIRS[truck.dir].yaw;
+      }
+    }
+
+    function eraseAt(tx, tz) {
+      if (!isInBounds(tx, tz)) return;
+      const extra = roadExtras.get(key(tx, tz));
+      if (extra) {
+        if (extra.crossing) {
+          for (let i = decorGroup.children.length - 1; i >= 0; i--) {
+            const c = decorGroup.children[i];
+            if (c.userData?.type === 'crossing' && c.userData.tx === tx && c.userData.tz === tz) decorGroup.remove(c);
+          }
+          extra.crossing = false;
+        }
+        if (extra.light) { decorGroup.remove(extra.light); extra.light = null; }
+        roadExtras.set(key(tx, tz), extra);
+      }
+      if (grid[tx][tz] === 1) {
+        grid[tx][tz] = 0;
+        roadExtras.delete(key(tx, tz));
+        refreshRoadAndNeighbors(tx, tz);
+        refreshBuildingGardens();
+        return;
+      }
+      if (grid[tx][tz] === 2) {
+        for (const [k, data] of buildingMap) {
+          const b = BUILDINGS[data.type];
+          if (tx >= data.tx && tx < data.tx + b.w && tz >= data.tz && tz < data.tz + b.h) {
+            if (data.type !== 'pole') for (let dx = 0; dx < b.w; dx++) for (let dz = 0; dz < b.h; dz++) grid[data.tx + dx][data.tz + dz] = 0;
+            for (let i = buildingsGroup.children.length - 1; i >= 0; i--) {
+              const c = buildingsGroup.children[i];
+              if (c === data.mesh || c.position.distanceTo(data.mesh.position) < Math.max(b.w, b.h) * TILE * 0.75) buildingsGroup.remove(c);
+            }
+            totalPop -= data.pax; totalCars -= Math.floor(data.pax / 4); totalBuildings--;
+            if (b.jobs) totalJobs -= b.jobs;
+            buildingMap.delete(k); refreshBuildingGardens(); refreshPowerNetwork(); updateStats(); return;
+          }
+        }
+      }
+      if (grid[tx][tz] === 4) {
+        for (const [k, mill] of millMap) {
+          if (tx >= mill.tx && tx < mill.tx + mill.w && tz >= mill.tz && tz < mill.tz + mill.h) {
+            for (let dx=0; dx<mill.w; dx++) for (let dz=0; dz<mill.h; dz++) grid[mill.tx+dx][mill.tz+dz]=0;
+            buildingsGroup.remove(mill.group); totalJobs -= mill.jobs; totalBuildings--; millMap.delete(k); refreshBuildingGardens(); refreshPowerNetwork(); updateStats(); return;
+          }
+        }
+      }
+      if (grid[tx][tz] === 3) {
+        for (const [k, farm] of farmMap) {
+          if (tx >= farm.tx && tx < farm.tx + farm.w && tz >= farm.tz && tz < farm.tz + farm.h) {
+            for (let dx = 0; dx < farm.w; dx++) for (let dz = 0; dz < farm.h; dz++) grid[farm.tx + dx][farm.tz + dz] = 0;
+            buildingsGroup.remove(farm.group);
+            totalJobs -= farm.jobs; totalBuildings--;
+            // Remove trucks linked to this farm
+            for (let i = trucks.length - 1; i >= 0; i--) {
+              if (trucks[i].farmKey === k) {
+                carsGroup.remove(trucks[i].mesh);
+                trucks.splice(i, 1);
+              }
+            }
+            farmMap.delete(k); refreshBuildingGardens(); refreshPowerNetwork(); updateStats(); return;
+          }
+        }
+      }
+    }
+
+    function clearPreview() { while (previewGroup.children.length) previewGroup.remove(previewGroup.children[0]); }
+    function showPreview(tx, tz, tool) {
+      clearPreview();
+      if (['road','erase','crossing','trafficlight'].includes(tool)) {
+        if (!isInBounds(tx, tz)) return false;
+        let col = COLORS.hover;
+        if (tool === 'erase') col = COLORS.invalid;
+        if ((tool === 'crossing' || tool === 'trafficlight') && !isRoad(tx, tz)) col = COLORS.invalid;
+        const m = new THREE.Mesh(new THREE.BoxGeometry(TILE * 0.95, 0.4, TILE * 0.95), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55 }));
+        m.position.set(tx * TILE + TILE / 2, 0.25, tz * TILE + TILE / 2);
+        previewGroup.add(m);
+        return tool === 'erase' || tool === 'road' || isRoad(tx, tz);
+      }
+      if (tool === 'wheat' || tool === 'rice') {
+        const f = FARMS[tool];
+        if (!f || !isInBounds(tx, tz, f.w, f.h)) return false;
+        const valid = isAreaFree(tx, tz, f.w, f.h) && touchesRoad(tx, tz, f.w, f.h);
+        const col = valid ? (tool === 'wheat' ? COLORS.wheat : COLORS.rice) : COLORS.invalid;
+        const m = new THREE.Mesh(new THREE.BoxGeometry(f.w * TILE * 0.9, 2, f.h * TILE * 0.9), new THREE.MeshLambertMaterial({ color: col, transparent: true, opacity: 0.5 }));
+        m.position.set(tx * TILE + f.w * TILE / 2, 1, tz * TILE + f.h * TILE / 2);
+        previewGroup.add(m); return valid;
+      }
+      if (tool === 'powerplant') {
+        const valid = isInBounds(tx,tz,4,4) && isAreaFree(tx,tz,4,4) && hasRoadFrontage(tx,tz,4,4);
+        const m = new THREE.Mesh(new THREE.BoxGeometry(4*TILE*0.9,8,4*TILE*0.9),new THREE.MeshLambertMaterial({color:valid?0x64748b:COLORS.invalid,transparent:true,opacity:0.5}));
+        m.position.set(tx*TILE+2*TILE,4,tz*TILE+2*TILE);previewGroup.add(m);return valid;
+      }
+      if (tool === 'mill') {
+        const valid = isInBounds(tx,tz,4,4) && isAreaFree(tx,tz,4,4) && hasRoadFrontage(tx,tz,4,4);
+        const m = new THREE.Mesh(new THREE.BoxGeometry(4*TILE*0.9,5,4*TILE*0.9),new THREE.MeshLambertMaterial({color:valid?COLORS.mill:COLORS.invalid,transparent:true,opacity:0.5}));
+        m.position.set(tx*TILE+2*TILE,2.5,tz*TILE+2*TILE);previewGroup.add(m);return valid;
+      }
+      const b = BUILDINGS[tool];
+      if (!b || !isInBounds(tx, tz, b.w, b.h)) return false;
+      const valid = tool === 'pole' ? (grid[tx][tz] !== 1 && ![...buildingMap.values()].some(p => p.type==='pole' && Math.abs(p.tx-tx)+Math.abs(p.tz-tz)<3)) : (isAreaFree(tx, tz, b.w, b.h) && hasRoadFrontage(tx, tz, b.w, b.h));
+      const previewHeight = tool === 'wind' ? 1.5 : (tool === 'pole' ? 0.5 : b.height * 0.65);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(b.w * TILE * 0.9, previewHeight, b.h * TILE * 0.9), new THREE.MeshLambertMaterial({ color: valid ? b.color : COLORS.invalid, transparent: true, opacity: 0.5 }));
+      m.position.set(tx * TILE + b.w * TILE / 2, previewHeight / 2, tz * TILE + b.h * TILE / 2);
+      previewGroup.add(m); return valid;
+    }
+    function getRoadPath(a, b) {
+      const path = [];
+      // Default orthogonal path: horizontal first, then vertical.
+      const sx = Math.sign(b.x - a.x), sz = Math.sign(b.z - a.z);
+      let x = a.x, z = a.z;
+      path.push({x,z});
+      while (x !== b.x) { x += sx; path.push({x,z}); }
+      while (z !== b.z) { z += sz; path.push({x,z}); }
+      return path;
+    }
+    function inspectRoadPath(path) {
+      const conflicts = [];
+      let newTiles = 0, existingTiles = 0, intersections = 0, joins = 0;
+      const pathSet = new Set(path.map(p => `${p.x},${p.z}`));
+      for (const p of path) {
+        if (!isInBounds(p.x,p.z)) { conflicts.push(`Hors carte (${p.x}, ${p.z})`); continue; }
+        if (grid[p.x][p.z] === 0) newTiles++;
+        else if (grid[p.x][p.z] === 1) { existingTiles++; joins++; }
+        else conflicts.push(`Case occupée (${p.x}, ${p.z})`);
+        let roadNeighbors = 0;
+        for (const d of DIRS) {
+          const nx=p.x+d.dx, nz=p.z+d.dz;
+          if (!isInBounds(nx,nz)) continue;
+          if (grid[nx][nz]===1 && !pathSet.has(`${nx},${nz}`)) roadNeighbors++;
+        }
+        const prev = path.findIndex(q=>q.x===p.x && q.z===p.z)>0;
+        if (roadNeighbors>=2) intersections++;
+        if (roadNeighbors===1) joins++;
+      }
+      return {valid:conflicts.length===0,newTiles,existingTiles,intersections,joins,conflicts:[...new Set(conflicts)]};
+    }
+    function previewRoadPath(path) {
+      clearPreview();
+      const check = inspectRoadPath(path);
+      for (const p of path) {
+        const inBounds = isInBounds(p.x,p.z);
+        const blocked = !inBounds || (grid[p.x][p.z] !== 0 && grid[p.x][p.z] !== 1);
+        const color = blocked ? COLORS.invalid : (grid[p.x][p.z]===1 ? 0x22c55e : 0x38bdf8);
+        const tile = new THREE.Mesh(
+          new THREE.BoxGeometry(TILE*0.92,0.28,TILE*0.92),
+          new THREE.MeshBasicMaterial({color, transparent:true, opacity:0.68})
+        );
+        tile.position.set(p.x*TILE+TILE/2,0.22,p.z*TILE+TILE/2);
+        previewGroup.add(tile);
+      }
+      const details = document.getElementById('route-preview-details');
+      const bar = document.getElementById('confirm-bar');
+      bar.classList.add('route-mode');
+      details.style.display = 'block';
+      details.innerHTML = `<strong>Type : ${ROAD_TYPES[selectedRoadType].name}</strong> · ${ROAD_TYPES[selectedRoadType].speed} km/h · ${ROAD_TYPES[selectedRoadType].lanes} voies<br><strong>${check.newTiles} nouvelles cases</strong> · ${check.existingTiles} cases de route déjà présentes<br>${check.intersections} zone(s) d’intersection détectée(s) · ${check.joins} raccordement(s)<br>Les carrefours seront actualisés automatiquement après construction.` +
+        (check.conflicts.length ? `<br><span style="color:#fca5a5">Obstacles : ${check.conflicts.slice(0,3).join(' ; ')}</span>` : '<br><span style="color:#86efac">Tracé valide</span>');
+      return check.valid;
+    }
+    function setPending(tx, tz, tool) {
+      const valid = showPreview(tx, tz, tool);
+      if (!valid && tool !== 'erase') { pending = null; confirmBar.classList.remove('visible'); return; }
+      if (tool === 'erase' && !isInBounds(tx, tz)) { pending = null; confirmBar.classList.remove('visible'); return; }
+      pending = { tx, tz, tool }; confirmBar.classList.add('visible');
+      const names = { road: 'Route', crossing: 'Passage piéton', trafficlight: 'Feu tricolore', erase: 'Effacer', house: 'Petite maison', medium: 'Immeuble moyen', large: 'Grand immeuble', wheat: 'Champ de blé', rice: 'Champ de riz', mill: 'Minoterie', powerplant: 'Centrale électrique', solar: 'Parc solaire', wind: 'Éolienne', pole: 'Poteau électrique' };
+      if (['house','medium','large'].includes(tool)) {
+        const b = BUILDINGS[tool];
+        confirmInfo.innerHTML = `<strong>${b.name}</strong> · ${b.pax} pax · ${Math.floor(b.pax/4)} voitures`;
+      } else if (tool === 'mill') {
+        confirmInfo.innerHTML = '<strong>Minoterie</strong> · 4×4 · 5 emplois · 80 kWh/j · blé → farine';
+      } else if (tool === 'powerplant') {
+        confirmInfo.innerHTML = '<strong>Centrale électrique</strong> · 4×4 · 8 emplois · production 500 kWh/j';
+      } else if (tool === 'solar' || tool === 'wind') {
+        const b = BUILDINGS[tool];
+        confirmInfo.innerHTML = `<strong>${b.name}</strong> · ${b.w}×${b.h} · ${b.jobs} emploi(s) · production ${b.production} kWh/j`;
+      } else if (tool === 'wheat' || tool === 'rice') {
+        const f = FARMS[tool];
+        confirmInfo.innerHTML = `<strong>${f.name}</strong> · +${f.food} nourr. · ${f.jobs} emplois · 1 camion`;
+      } else confirmInfo.innerHTML = tool === 'road' ? `<strong>${ROAD_TYPES[selectedRoadType].name}</strong> · sélectionnez le point d’arrivée` : `<strong>${names[tool]||tool}</strong> (${tx}, ${tz})`;
+    }
+    function cancelPending() { pending = null; roadStart = null; clearPreview(); confirmBar.classList.remove('visible'); confirmBar.classList.remove('route-mode'); const rd=document.getElementById('route-preview-details'); if(rd){rd.style.display='none';rd.innerHTML='';} const cb=document.getElementById('btn-confirm'); cb.disabled=false; cb.style.opacity='1'; }
+    // Flotte dédiée à l'industrie pétrolière : deux camions-citernes par raffinerie.
+    const oilTankers = [];
+    function spawnOilTankersForRefinery(tx, tz) {
+      const startX = tx + 2, startZ = tz + 5;
+      for (let i = 0; i < 2; i++) {
+        const group = new THREE.Group();
+        const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.65,0.65,2.2,10), new THREE.MeshStandardMaterial({color:0xe5e7eb, metalness:0.35, roughness:0.55}));
+        tank.rotation.z = Math.PI/2; tank.position.y = 1.35; group.add(tank);
+        const cab = new THREE.Mesh(new THREE.BoxGeometry(1.2,1.1,1.25), new THREE.MeshStandardMaterial({color:0xf59e0b}));
+        cab.position.set(1.35,0.95,0); group.add(cab);
+        for (const z of [-0.48,0.48]) for (const x of [-0.65,0.95]) {
+          const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,0.18,8), new THREE.MeshStandardMaterial({color:0x111827}));
+          wheel.rotation.x = Math.PI/2; wheel.position.set(x,0.35,z); group.add(wheel);
+        }
+        group.position.set((tx+2)*TILE,0.1,(tz+5+i)*TILE);
+        carsGroup.add(group);
+        oilTankers.push({mesh:group, refinery:{tx,tz}, phase:i*0.5, state:'toOilfield', crude:0});
+      }
+    }
+    function updateOilTankers() {
+      // Conservative first implementation: tankers visibly circulate between oil wells and refinery.
+      const wells = [...buildingMap.values()].filter(b=>b.type==='oilwell');
+      for (const t of oilTankers) {
+        if (!wells.length) { t.mesh.visible = false; continue; }
+        t.mesh.visible = true;
+        t.phase += 0.0025;
+        const well = wells[Math.floor((t.phase*0.15)%wells.length)];
+        const refineryX=(t.refinery.tx+2.5)*TILE, refineryZ=(t.refinery.tz+2.5)*TILE;
+        const wellX=(well.tx+1.5)*TILE, wellZ=(well.tz+1.5)*TILE;
+        const loop=(t.phase%2);
+        const from=loop<1?wellX:refineryX, to=loop<1?refineryX:wellX;
+        const fromZ=loop<1?wellZ:refineryZ, toZ=loop<1?refineryZ:wellZ;
+        const f=loop<1?loop:loop-1;
+        t.mesh.position.x=from+(to-from)*f;
+        t.mesh.position.z=fromZ+(toZ-fromZ)*f;
+        t.mesh.rotation.y=Math.atan2(to-from,toZ-fromZ);
+      }
+    }
+
+    function confirmPending() {
+      if (!pending) return;
+      const { tx, tz, tool } = pending;
+      if (tool === 'road') {
+        if (pending.path) {
+          const path = pending.path;
+          if (inspectRoadPath(path).valid) {
+            for (const p of path) if (grid[p.x][p.z]===0) placeRoad(p.x,p.z,selectedRoadType);
+          }
+        } else placeRoad(tx, tz, selectedRoadType);
+      }
+      else if (tool === 'crossing') placeCrossing(tx, tz);
+      else if (tool === 'trafficlight') placeTrafficLight(tx, tz);
+      else if (tool === 'erase') eraseAt(tx, tz);
+      else if (tool === 'wheat' || tool === 'rice') placeFarm(tx, tz, tool);
+      else if (tool === 'mill') placeMill(tx, tz);
+      else {
+        placeBuilding(tx, tz, tool);
+        if (tool === 'refinery') {
+          // Two dedicated tanker trucks are created for this refinery.
+          const refineryKey = key(tx, tz);
+          const refineryData = buildingMap.get(refineryKey);
+          if (refineryData) {
+            refineryData.tankers = 2;
+            refineryData.crudeStock = 0;
+            refineryData.fuelStock = 0;
+            spawnOilTankersForRefinery(tx, tz);
+          }
+        }
+      }
+      cancelPending();
+    }
+
+    const raycaster = new THREE.Raycaster(), mouse = new THREE.Vector2();
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    let pointerDownPos = null, isDragging = false;
+    function getTileFromEvent(e) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      const cx = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+      const cy = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+      mouse.x = ((cx - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((cy - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const hit = new THREE.Vector3();
+      if (!raycaster.ray.intersectPlane(plane, hit)) return null;
+      return { x: Math.floor(hit.x / TILE), z: Math.floor(hit.z / TILE) };
+    }
+    function onDown(e) {
+      if (e.target.closest('#sidebar, #toggle-sidebar, #confirm-bar, #info-panel')) return;
+      pointerDownPos = { x: e.changedTouches ? e.changedTouches[0].clientX : e.clientX, y: e.changedTouches ? e.changedTouches[0].clientY : e.clientY };
+      isDragging = false;
+    }
+    function onMove(e) {
+      if (!pointerDownPos) return;
+      const x = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+      const y = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+      if (Math.hypot(x - pointerDownPos.x, y - pointerDownPos.y) > 14) isDragging = true;
+    }
+    function onUp(e) {
+      if (!pointerDownPos) return;
+      if (!isDragging) {
+        const tile = getTileFromEvent(e);
+        if (tile) {
+          if (currentTool === 'road') {
+            if (!roadStart) {
+              roadStart = {x:tile.x,z:tile.z};
+              clearPreview();
+              const mark = new THREE.Mesh(new THREE.BoxGeometry(TILE*0.92,0.3,TILE*0.92),new THREE.MeshBasicMaterial({color:0x22c55e,transparent:true,opacity:0.75}));
+              mark.position.set(tile.x*TILE+TILE/2,0.25,tile.z*TILE+TILE/2); previewGroup.add(mark);
+              confirmInfo.textContent = 'Début choisi. Touchez la case de fin de la route.'; document.getElementById('route-preview-details').style.display='none';
+              confirmBar.classList.add('visible');
+              document.getElementById('btn-confirm').disabled = true;
+              document.getElementById('btn-confirm').style.opacity = '0.45';
+              pointerDownPos = null; isDragging = false; return;
+            } else {
+              const path = getRoadPath(roadStart,{x:tile.x,z:tile.z});
+              const valid = previewRoadPath(path);
+              pending = {tx:roadStart.x,tz:roadStart.z,tool:'road',path};
+              confirmInfo.textContent = valid ? `Route de ${path.length} cases · confirmez ou annulez` : 'Tracé impossible : une case est occupée par un bâtiment.';
+              confirmBar.classList.add('visible');
+              document.getElementById('btn-confirm').disabled = !valid;
+              document.getElementById('btn-confirm').style.opacity = valid ? '1' : '0.45';
+              pointerDownPos = null; isDragging = false; return;
+            }
+          }
+          // Inspect building/farm unless erasing
+          if (currentTool !== 'erase' && showInfoAt(tile.x, tile.z)) {
+            // info shown
+          } else {
+            hideInfo();
+            setPending(tile.x, tile.z, currentTool);
+          }
+        }
+      }
+      pointerDownPos = null; isDragging = false;
+    }
+    renderer.domElement.addEventListener('pointerdown', onDown);
+    renderer.domElement.addEventListener('pointermove', onMove);
+    renderer.domElement.addEventListener('pointerup', onUp);
+    renderer.domElement.addEventListener('pointercancel', () => { pointerDownPos = null; isDragging = false; });
+    renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+    addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+    // Starter continuous cross
+    for (let i = 6; i < 34; i++) placeRoad(i, 20);
+    for (let i = 10; i < 30; i++) placeRoad(20, i);
+    for (let i = 14; i < 26; i++) placeRoad(i, 14);
+    for (let i = 14; i < 26; i++) placeRoad(26, i);
+
+    // Extra roads for more intersections
+    for (let i = 10; i < 30; i++) placeRoad(14, i);
+    for (let i = 10; i < 30; i++) placeRoad(i, 26);
+
+    window.runTestScenario = function() {
+      // 5 large (3x3) + 2 medium (2x2) next to roads
+      const larges = [[16,21],[22,21],[17,15],[22,15],[11,21]];
+      const mediums = [[17,27],[22,27]];
+      for (const [x,z] of larges) placeBuilding(x, z, 'large');
+      for (const [x,z] of mediums) placeBuilding(x, z, 'medium');
+      // Traffic lights at main intersections
+      const lights = [[20,20],[14,20],[26,20],[20,14],[20,26],[14,14],[26,14],[14,26],[26,26]];
+      for (const [x,z] of lights) placeTrafficLight(x, z);
+      // Crossings at some intersections
+      for (const [x,z] of [[20,20],[14,20],[26,20],[20,14],[20,26]]) placeCrossing(x, z);
+      return {
+        pop: totalPop, cars: totalCars, buildings: totalBuildings,
+        carCount: cars.length, lightCount: [...roadExtras.values()].filter(e => e.light).length
+      };
+    };
+    window.getRoadTypeState = function(){ return {selected:selectedRoadType, types:Object.keys(ROAD_TYPES).map(k=>({id:k,...ROAD_TYPES[k]})), placed:[...roadExtras.entries()].filter(([k,v])=>v.roadType).length}; };
+    window.getRoadNetworkState = function() {
+      let roadTiles=0, junctions=0;
+      for(let x=0;x<GRID_SIZE;x++) for(let z=0;z<GRID_SIZE;z++) if(isRoad(x,z)) {
+        roadTiles++;
+        if(DIRS.reduce((n,d)=>n+(isRoad(x+d.dx,z+d.dz)?1:0),0)>=3) junctions++;
+      }
+      return {roadTiles, junctions};
+    };
+    window.getSimState = function() {
+      const stopped = cars.filter(c => c.speed < 0.001).length;
+      const moving = cars.filter(c => c.speed >= 0.001).length;
+      const g = typeof getGlobalPhase === 'function' ? getGlobalPhase() : -1;
+      return {
+        hour: gameHour.toFixed(2), phase: g,
+        totalCars: cars.length, moving, stopped,
+        pop: totalPop, buildings: totalBuildings
+      };
+    };
+
+    // ===== Sauvegarde locale =====
+    const SAVE_KEY = "hebergement3d_save_v1";
+    const saveStatus = document.getElementById("save-status");
+    function collectSaveData() {
+      return {
+        version: 1, savedAt: new Date().toISOString(),
+        grid: grid.map(col => col.slice()),
+        roadExtras: Array.from(roadExtras.entries()),
+        buildings: Array.from(buildingMap.values()).map(b => ({type:b.type, tx:b.tx, tz:b.tz})),
+        farms: Array.from(farmMap.values()).map(f => ({type:f.type, tx:f.tx, tz:f.tz, growthDay:f.growthDay||0})),
+        mills: Array.from(millMap.values()).map(m => ({type:"mill", tx:m.tx, tz:m.tz, wheatStock:m.wheatStock||0})),
+        gameDay, wheatStock, flourStock, foodStock, selectedRoadType
+      };
+    }
+    function refreshSaveStatus() {
+      try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (!raw) { saveStatus.textContent = "Aucune sauvegarde détectée."; return; }
+        const data = JSON.parse(raw);
+        saveStatus.textContent = "Dernière sauvegarde : " + new Date(data.savedAt).toLocaleString();
+      } catch(e) { saveStatus.textContent = "Sauvegarde illisible."; }
+    }
+    document.getElementById("save-game-btn").addEventListener("click", () => {
+      try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(collectSaveData()));
+        refreshSaveStatus();
+        alert("Partie sauvegardée sur cet appareil.");
+      } catch(e) {
+        alert("Échec de la sauvegarde. Vérifiez l’espace disponible et les autorisations du navigateur.");
+      }
+    });
+    document.getElementById("load-game-btn").addEventListener("click", () => {
+      try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (!raw) { alert("Aucune sauvegarde disponible sur cet appareil."); return; }
+        const data = JSON.parse(raw);
+        if (data.version !== 1 || !Array.isArray(data.grid) || !Array.isArray(data.roadExtras)) {
+          alert("Cette sauvegarde n’est pas compatible."); return;
+        }
+        alert("Sauvegarde trouvée (" + new Date(data.savedAt).toLocaleString() + "), mais la restauration complète des objets 3D doit encore être activée. Votre sauvegarde reste intacte.");
+      } catch(e) { alert("Impossible de lire la sauvegarde."); }
+    });
+    document.getElementById("new-game-btn").addEventListener("click", () => {
+      if (!confirm("Commencer une nouvelle partie ? La sauvegarde existante sera conservée.")) return;
+      sessionStorage.removeItem("hebergement3d_pending_load");
+      location.reload();
+    });
+    refreshSaveStatus();
+
+    function animate() {
+      updateOilTankers();
+      for (const d of buildingMap.values()) if (d.type === 'wind' && d.mesh?.userData?.rotor) d.mesh.userData.rotor.rotation.z += 0.025;
+      requestAnimationFrame(animate);
+      updateDayNight(); updateCars(); updateTrucks(); updateTrafficLights(); updatePeople();
+      controls.update(); renderer.render(scene, camera);
+    }
+    animate(); updateStats();
+    if (innerWidth < 700) sidebar.classList.add('collapsed');
+  })();
+  </script>
+</body>
+</html>
